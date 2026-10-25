@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1020" viewBox="0 0 1600 1020" fill="none">
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#151D22" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1600" height="1020" fill="#0B0E12"/>
+  <rect width="1600" height="1020" fill="url(#grid)"/>
+
+  <!-- Header bar -->
+  <line x1="72" y1="88" x2="1528" y2="88" stroke="#222C32" stroke-width="1"/>
+  <text x="72" y="64" font-family="'Cascadia Mono', Consolas, monospace" font-size="13" letter-spacing="1.5" fill="#8A9B9E">STXIC HALO // DESIGN SPECIFICATION SHEET v1.1</text>
+  <text x="1528" y="64" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="13" fill="#B5F5CD">96×96 CONCENTRIC RETICLE</text>
+
+  <!-- Left column: Identity & Construction Geometry -->
+  <text x="72" y="156" font-family="'Segoe UI Variable Display', 'Segoe UI', sans-serif" font-size="56" font-weight="700" letter-spacing="-2.2" fill="#F3F6F5">stxic<tspan fill="#B5F5CD" font-weight="500">halo</tspan></text>
+  <text x="72" y="192" font-family="'Segoe UI', sans-serif" font-size="18" fill="#95A5A8">Top-edge Windows instrument for local AI agent sessions &amp; machine telemetry.</text>
+
+  <!-- Geometric Construction Blueprint Card -->
+  <rect x="72" y="228" width="680" height="410" rx="16" fill="#11161B" stroke="#263138"/>
+  <text x="100" y="264" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" letter-spacing="1.2" fill="#8E9FA3">01 / ORBITAL RETICLE GEOMETRY (CENTER 48, 48)</text>
+
+  <!-- Blueprint diagram inside card -->
+  <g transform="translate(120, 290) scale(3.1)">
+    <rect x="0" y="0" width="96" height="96" fill="#0B0E12" stroke="#222D33" stroke-width="0.5"/>
+    <line x1="48" y1="0" x2="48" y2="96" stroke="#1E2930" stroke-width="0.4" stroke-dasharray="2 2"/>
+    <line x1="0" y1="48" x2="96" y2="48" stroke="#1E2930" stroke-width="0.4" stroke-dasharray="2 2"/>
+    <circle cx="48" cy="48" r="32" stroke="#24343B" stroke-width="0.4" stroke-dasharray="1.5 1.5"/>
+    <circle cx="48" cy="48" r="19" stroke="#24343B" stroke-width="0.4" stroke-dasharray="1.5 1.5"/>
+    <line x1="48" y1="48" x2="75.71" y2="32" stroke="#365947" stroke-width="0.5" stroke-dasharray="1.5 1.5"/>
+    <path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#B5F5CD" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/>
+  </g>
+
+  <!-- Callout specs on right of blueprint -->
+  <g font-family="'Cascadia Mono', Consolas, monospace" font-size="13" fill="#C7D4D6">
+    <text x="456" y="332" fill="#B5F5CD" font-weight="700">OUTER ORBIT (R = 32)</text>
+    <text x="456" y="354" fill="#8E9FA3" font-size="12">312° arc · stroke 6.5px</text>
+    <text x="456" y="372" fill="#8E9FA3" font-size="12">Aperture: 48° at θ = -30°</text>
+
+    <text x="456" y="420" fill="#B5F5CD" font-weight="700">INNER DATUM (R = 19)</text>
+    <text x="456" y="442" fill="#8E9FA3" font-size="12">60° arc (195° → 255°)</text>
+    <text x="456" y="460" fill="#8E9FA3" font-size="12">Balances upper-left mass</text>
+
+    <text x="456" y="508" fill="#B5F5CD" font-weight="700">SENTINEL NODE (r = 5.25)</text>
+    <text x="456" y="530" fill="#8E9FA3" font-size="12">Seated at (75.71, 32.00)</text>
+    <text x="456" y="548" fill="#8E9FA3" font-size="12">5.06px cap clearance</text>
+
+    <text x="456" y="592" fill="#F3F6F5" font-weight="700">CORE (r = 8.5 at 48,48)</text>
+  </g>
+
+  <!-- Right column: Semantic Palette & Contrast Tokens -->
+  <rect x="784" y="116" width="744" height="522" rx="16" fill="#11161B" stroke="#263138"/>
+  <text x="812" y="152" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" letter-spacing="1.2" fill="#8E9FA3">02 / SURFACE &amp; SIGNAL TOKENS (WCAG AA/AAA VERIFIED)</text>
+
+  <g font-family="'Segoe UI', sans-serif">
+    <rect x="812" y="176" width="220" height="136" rx="12" fill="#0B0E12" stroke="#2A353B"/>
+    <text x="828" y="274" font-size="15" font-weight="600" fill="#F3F6F5">Obsidian Canvas</text>
+    <text x="828" y="295" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#8E9FA3">--bg #0B0E12</text>
+
+    <rect x="1046" y="176" width="220" height="136" rx="12" fill="#141A1F" stroke="#2A353B"/>
+    <text x="1062" y="274" font-size="15" font-weight="600" fill="#F3F6F5">Instrument Panel</text>
+    <text x="1062" y="295" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#8E9FA3">--panel #141A1F</text>
+
+    <rect x="1280" y="176" width="220" height="136" rx="12" fill="#F3F6F5"/>
+    <text x="1296" y="274" font-size="15" font-weight="600" fill="#0B0E12">Primary Readout</text>
+    <text x="1296" y="295" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#374549">--text #F3F6F5 (17.4:1)</text>
+
+    <rect x="812" y="330" width="220" height="136" rx="12" fill="#B5F5CD"/>
+    <text x="828" y="428" font-size="15" font-weight="600" fill="#0B0E12">Nominal / Active</text>
+    <text x="828" y="449" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#1E3F2B">--mint #B5F5CD (14.8:1)</text>
+
+    <rect x="1046" y="330" width="220" height="136" rx="12" fill="#F5C875"/>
+    <text x="1062" y="428" font-size="15" font-weight="600" fill="#0B0E12">Attention / Blocked</text>
+    <text x="1062" y="449" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#47330E">--amber #F5C875 (12.1:1)</text>
+
+    <rect x="1280" y="330" width="220" height="136" rx="12" fill="#F28B8F"/>
+    <text x="1296" y="428" font-size="15" font-weight="600" fill="#0B0E12">Failed Verification</text>
+    <text x="1296" y="449" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#4A1518">--coral #F28B8F (8.6:1)</text>
+  </g>
+
+  <text x="812" y="508" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#8E9FA3">SMALL-SCALE LEGIBILITY BENCHMARK: 48px / 28px / 20px / 16px</text>
+  <g transform="translate(812, 526) scale(0.5)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#B5F5CD" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <g transform="translate(888, 536) scale(0.2916)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#B5F5CD" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <g transform="translate(944, 540) scale(0.2083)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#B5F5CD" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <g transform="translate(988, 542) scale(0.1667)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#B5F5CD" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <text x="1032" y="555" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#9FB0B3">Non-notched floating capsule · Tabular numerals · Always pairs color with text label</text>
+
+  <!-- Bottom Row: Top-Edge Capsule State Specimens -->
+  <rect x="72" y="668" width="1456" height="280" rx="16" fill="#11161B" stroke="#263138"/>
+  <text x="100" y="706" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" letter-spacing="1.2" fill="#8E9FA3">03 / TOP-EDGE CAPSULE STATES (1:1 PROPORTION SPECIMENS)</text>
+
+  <!-- Capsule 1: Nominal Working -->
+  <rect x="100" y="736" width="680" height="64" rx="18" fill="#0B0E12" stroke="#2B383E" stroke-width="1.5"/>
+  <g transform="translate(118, 752) scale(0.3333)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#B5F5CD" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <text x="164" y="773" font-family="'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#F3F6F5">2 sessions working</text>
+  <text x="320" y="773" font-family="'Cascadia Mono', Consolas, monospace" font-size="13" fill="#8E9FA3">portfolio-app · Bash</text>
+  <rect x="524" y="752" width="124" height="32" rx="8" fill="#141E1B" stroke="#284235"/>
+  <text x="586" y="773" text-anchor="middle" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#B5F5CD">CPU 28% · 7.4G</text>
+  <circle cx="752" cy="768" r="5" fill="#B5F5CD"/>
+
+  <!-- Capsule 2: Blocked / Needs Review -->
+  <rect x="816" y="736" width="680" height="64" rx="18" fill="#0B0E12" stroke="#594526" stroke-width="1.5"/>
+  <g transform="translate(834, 752) scale(0.3333)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#F5C875" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#F5C875"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <text x="880" y="773" font-family="'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#F3F6F5">Claude awaiting review</text>
+  <text x="1064" y="773" font-family="'Cascadia Mono', Consolas, monospace" font-size="13" fill="#D5B887">2 tests failed · 8 files Δ</text>
+  <rect x="1296" y="752" width="176" height="32" rx="8" fill="#2A2115" stroke="#634C27"/>
+  <text x="1384" y="773" text-anchor="middle" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" font-weight="600" fill="#F5C875">PERMISSION REQUEST</text>
+
+  <!-- Footer annotation -->
+  <text x="100" y="852" font-family="'Segoe UI', sans-serif" font-size="16" font-weight="600" fill="#E3ECEA">Design discipline: specificity over decoration.</text>
+  <text x="100" y="880" font-family="'Segoe UI', sans-serif" font-size="14" fill="#8E9FA3">No marketing slogans inside operational tabs. Every badge reflects a real local hook event or sysinfo reading.</text>
+  <text x="1496" y="880" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#6F8185">STXIC // 2026</text>
+</svg>

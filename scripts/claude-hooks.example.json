@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [{"hooks": [{"type": "command", "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\ABSOLUTE\\PATH\\stxic-halo\\scripts\\claude-hook.ps1\""}]}],
+    "PreToolUse": [{"hooks": [{"type": "command", "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\ABSOLUTE\\PATH\\stxic-halo\\scripts\\claude-hook.ps1\""}]}],
+    "PostToolUse": [{"hooks": [{"type": "command", "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\ABSOLUTE\\PATH\\stxic-halo\\scripts\\claude-hook.ps1\""}]}],
+    "PermissionRequest": [{"hooks": [{"type": "command", "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\ABSOLUTE\\PATH\\stxic-halo\\scripts\\claude-hook.ps1\""}]}],
+    "Stop": [{"hooks": [{"type": "command", "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\ABSOLUTE\\PATH\\stxic-halo\\scripts\\claude-hook.ps1\""}]}],
+    "SessionEnd": [{"hooks": [{"type": "command", "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"C:\\ABSOLUTE\\PATH\\stxic-halo\\scripts\\claude-hook.ps1\""}]}]
+  }
+}

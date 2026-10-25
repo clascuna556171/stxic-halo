@@ -1,0 +1,139 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="780" viewBox="0 0 1200 780" fill="none">
+  <defs>
+    <pattern id="hgrid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#141C21" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="panelGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#13191F"/>
+      <stop offset="100%" stop-color="#0D1217"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="780" rx="20" fill="#090C10" stroke="#222C32" stroke-width="2"/>
+  <rect x="2" y="2" width="1196" height="776" rx="18" fill="url(#hgrid)"/>
+
+  <!-- Simulated Windows 11 Display Top Edge & IDE Background Context -->
+  <rect x="24" y="20" width="1152" height="34" rx="8" fill="#10151A" stroke="#1E272E"/>
+  <text x="44" y="41" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#68787D">WIN11 DISPLAY TOP-EDGE // WORKSPACE: C:\Projects\portfolio-app</text>
+  <text x="1156" y="41" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#8A9B9E">LOCAL JSONL BRIDGE · 2.5s POLL</text>
+
+  <!-- Left Specimen: Collapsed Top-Edge Capsule (1:1 Concept) -->
+  <text x="48" y="96" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" letter-spacing="1.4" fill="#8E9FA3">STATE A // COLLAPSED TOP-EDGE HUD (440×54px)</text>
+  <rect x="48" y="112" width="460" height="58" rx="16" fill="#0E1419" stroke="#574426" stroke-width="1.5"/>
+  <g transform="translate(64, 125) scale(0.3333)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#F5C875" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#F5C875"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <text x="108" y="139" font-family="'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#F3F6F5">1 session awaiting review</text>
+  <text x="108" y="156" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#95A5A8">Claude Code · portfolio-app</text>
+  <rect x="332" y="126" width="116" height="30" rx="8" fill="#272015" stroke="#5E4826"/>
+  <text x="390" y="145" text-anchor="middle" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" font-weight="600" fill="#F5C875">2 FAIL · 28% CPU</text>
+  <path d="M 474 138 L 480 144 L 486 138" stroke="#8E9FA3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Event Pipeline Schematic under Collapsed Specimen -->
+  <rect x="48" y="204" width="460" height="252" rx="14" fill="#10161B" stroke="#222D34"/>
+  <text x="72" y="236" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" letter-spacing="1.2" fill="#B5F5CD">LOCAL TELEMETRY &amp; HOOK PIPELINE</text>
+
+  <rect x="72" y="256" width="412" height="50" rx="9" fill="#0B0E12" stroke="#243037"/>
+  <text x="88" y="278" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" font-weight="600" fill="#F3F6F5">1. scripts/claude-hook.ps1</text>
+  <text x="88" y="295" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#86979B">Opt-in hook · No prompt or transcript capture</text>
+
+  <rect x="72" y="320" width="412" height="50" rx="9" fill="#0B0E12" stroke="#243037"/>
+  <text x="88" y="342" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" font-weight="600" fill="#F3F6F5">2. %LOCALAPPDATA%\STXICHalo\events.jsonl</text>
+  <text x="88" y="359" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#86979B">Bounded tail reader · PermissionRequest / PostToolUse / Stop</text>
+
+  <rect x="72" y="384" width="412" height="50" rx="9" fill="#0B0E12" stroke="#243037"/>
+  <text x="88" y="406" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" font-weight="600" fill="#F3F6F5">3. Rust sysinfo + Verification Ledger</text>
+  <text x="88" y="423" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#86979B">Separates "response stopped" from verified test/git evidence</text>
+
+  <!-- Provenance & Honesty Callout Card -->
+  <rect x="48" y="480" width="460" height="252" rx="14" fill="#10161B" stroke="#222D34"/>
+  <text x="72" y="512" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" letter-spacing="1.2" fill="#8E9FA3">SIGNAL INTEGRITY GUARANTEES</text>
+  <g font-family="'Segoe UI', sans-serif" font-size="13" fill="#C7D4D6">
+    <circle cx="78" cy="544" r="4" fill="#B5F5CD"/>
+    <text x="94" y="549"><tspan font-weight="600" fill="#F3F6F5">Zero fabricated metrics:</tspan> missing context shows as —</text>
+    <circle cx="78" cy="582" r="4" fill="#F5C875"/>
+    <text x="94" y="587"><tspan font-weight="600" fill="#F3F6F5">Explicit verification state:</tspan> Stop ≠ tests passing</text>
+    <circle cx="78" cy="620" r="4" fill="#9DBFFD"/>
+    <text x="94" y="625"><tspan font-weight="600" fill="#F3F6F5">100% offline execution:</tspan> zero cloud telemetry</text>
+    <circle cx="78" cy="658" r="4" fill="#F28B8F"/>
+    <text x="94" y="663"><tspan font-weight="600" fill="#F3F6F5">Sample vs Live labeling:</tspan> prototype fixtures badged</text>
+  </g>
+  <text x="72" y="706" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#6F8185">CONCEPT SPECIMEN // SIMULATED DEMO SESSION DATA</text>
+
+  <!-- Right Specimen: Expanded Telemetry Console -->
+  <text x="548" y="96" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" letter-spacing="1.4" fill="#8E9FA3">STATE B // EXPANDED TELEMETRY CONSOLE</text>
+  <rect x="548" y="112" width="604" height="620" rx="20" fill="url(#panelGrad)" stroke="#2E3B42" stroke-width="1.5"/>
+
+  <!-- Console Header -->
+  <g transform="translate(572, 132) scale(0.3125)"><path d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11" stroke="#F3F6F5" stroke-width="6.5" stroke-linecap="round" fill="none"/><path d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65" stroke="#B5F5CD" stroke-width="3.5" stroke-linecap="round" fill="none"/><circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD"/><circle cx="48" cy="48" r="8.5" fill="#F3F6F5"/></g>
+  <text x="612" y="150" font-family="'Segoe UI Variable Display', 'Segoe UI', sans-serif" font-size="17" font-weight="700" fill="#F3F6F5">stxic<tspan fill="#B5F5CD" font-weight="500">halo</tspan></text>
+  <text x="696" y="150" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#829397">LOCAL SENTINEL</text>
+  <rect x="1012" y="133" width="92" height="24" rx="6" fill="#262118" stroke="#5B4829"/>
+  <text x="1058" y="149" text-anchor="middle" font-family="'Cascadia Mono', Consolas, monospace" font-size="10" font-weight="600" fill="#F5C875">DEMO FIXTURE</text>
+  <rect x="1112" y="133" width="24" height="24" rx="6" fill="#1B242A" stroke="#2D3940"/>
+  <path d="M 1119 147 L 1124 142 L 1129 147" stroke="#C5D2D4" stroke-width="1.6" stroke-linecap="round"/>
+
+  <!-- Console Navigation Bar -->
+  <line x1="548" y1="172" x2="1152" y2="172" stroke="#222D33"/>
+  <rect x="568" y="182" width="136" height="32" rx="7" fill="#1B2B24" stroke="#2F4D3E"/>
+  <text x="636" y="202" text-anchor="middle" font-family="'Segoe UI', sans-serif" font-size="12" font-weight="600" fill="#B5F5CD">Overview</text>
+  <text x="776" y="202" text-anchor="middle" font-family="'Segoe UI', sans-serif" font-size="12" fill="#8E9FA3">Evidence (2)</text>
+  <text x="916" y="202" text-anchor="middle" font-family="'Segoe UI', sans-serif" font-size="12" fill="#8E9FA3">System</text>
+  <text x="1056" y="202" text-anchor="middle" font-family="'Segoe UI', sans-serif" font-size="12" fill="#8E9FA3">Hooks</text>
+  <line x1="548" y1="224" x2="1152" y2="224" stroke="#222D33"/>
+
+  <!-- Blocking Action Alert -->
+  <rect x="572" y="242" width="556" height="104" rx="12" fill="#231D15" stroke="#5E4827"/>
+  <circle cx="594" cy="266" r="5" fill="#F5C875"/>
+  <text x="608" y="270" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" font-weight="700" fill="#F5C875">ACTION REQUIRED · PERMISSION REQUEST</text>
+  <text x="1108" y="270" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#B8A382">portfolio-app</text>
+  <text x="594" y="296" font-family="'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#F3F6F5">Claude Code paused on Bash · 2 sample tests failed</text>
+  <text x="594" y="320" font-family="'Cascadia Mono', Consolas, monospace" font-size="12" fill="#C4B399">8 files Δ · 6 passed · 2 failed (unverified fixture)</text>
+  <rect x="992" y="302" width="118" height="28" rx="6" fill="#3A2E1D" stroke="#6E5530"/>
+  <text x="1051" y="320" text-anchor="middle" font-family="'Segoe UI', sans-serif" font-size="11" font-weight="600" fill="#F5D9A0">Inspect diff →</text>
+
+  <!-- Active Sessions Ledger Header -->
+  <text x="572" y="376" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" letter-spacing="1" fill="#8E9FA3">ACTIVE SESSIONS (2)</text>
+  <text x="1128" y="376" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#8E9FA3">CONTEXT / TOKENS</text>
+
+  <!-- Session Row 1 -->
+  <rect x="572" y="388" width="556" height="96" rx="12" fill="#151C22" stroke="#28343B"/>
+  <rect x="588" y="404" width="64" height="22" rx="5" fill="#2A242D"/>
+  <text x="620" y="419" text-anchor="middle" font-family="'Cascadia Mono', Consolas, monospace" font-size="10" font-weight="600" fill="#F5B48B">CLAUDE</text>
+  <text x="664" y="419" font-family="'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#F3F6F5">Authentication refactor</text>
+  <text x="1112" y="419" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#F5C875">● Awaiting review</text>
+  <text x="588" y="444" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#8E9FA3">cwd: C:\Projects\portfolio-app · event: PermissionRequest (Bash)</text>
+  <rect x="588" y="458" width="340" height="6" rx="3" fill="#263137"/>
+  <rect x="588" y="458" width="231" height="6" rx="3" fill="#F5C875"/>
+  <text x="942" y="465" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#D5E0E2">68% ctx · 18,420 tok</text>
+
+  <!-- Session Row 2 -->
+  <rect x="572" y="496" width="556" height="96" rx="12" fill="#151C22" stroke="#28343B"/>
+  <rect x="588" y="512" width="64" height="22" rx="5" fill="#1D2A3A"/>
+  <text x="620" y="527" text-anchor="middle" font-family="'Cascadia Mono', Consolas, monospace" font-size="10" font-weight="600" fill="#9DBFFD">CODEX</text>
+  <text x="664" y="527" font-family="'Segoe UI', sans-serif" font-size="14" font-weight="600" fill="#F3F6F5">Optimizing database queries</text>
+  <text x="1112" y="527" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#B5F5CD">● Working</text>
+  <text x="588" y="552" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#8E9FA3">cwd: C:\Projects\portfolio-app · adapter: preview fixture</text>
+  <rect x="588" y="566" width="340" height="6" rx="3" fill="#263137"/>
+  <rect x="588" y="566" width="143" height="6" rx="3" fill="#B5F5CD"/>
+  <text x="942" y="573" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#D5E0E2">42% ctx · 8,260 tok</text>
+
+  <!-- Local Host Telemetry Readout Bar -->
+  <rect x="572" y="610" width="178" height="68" rx="10" fill="#13191F" stroke="#253037"/>
+  <text x="588" y="632" font-family="'Cascadia Mono', Consolas, monospace" font-size="10" fill="#8E9FA3">HOST CPU LOAD</text>
+  <text x="588" y="660" font-family="'Cascadia Mono', Consolas, monospace" font-size="20" font-weight="700" fill="#F3F6F5">28%</text>
+  <text x="650" y="660" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#9DBFFD">nominal</text>
+
+  <rect x="761" y="610" width="178" height="68" rx="10" fill="#13191F" stroke="#253037"/>
+  <text x="777" y="632" font-family="'Cascadia Mono', Consolas, monospace" font-size="10" fill="#8E9FA3">MEMORY COMMIT</text>
+  <text x="777" y="660" font-family="'Cascadia Mono', Consolas, monospace" font-size="20" font-weight="700" fill="#F3F6F5">7.4 GiB</text>
+  <text x="866" y="660" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#8E9FA3">/ 16.0 (46%)</text>
+
+  <rect x="950" y="610" width="178" height="68" rx="10" fill="#13191F" stroke="#253037"/>
+  <text x="966" y="632" font-family="'Cascadia Mono', Consolas, monospace" font-size="10" fill="#8E9FA3">PROCESS TABLE</text>
+  <text x="966" y="660" font-family="'Cascadia Mono', Consolas, monospace" font-size="20" font-weight="700" fill="#F3F6F5">192</text>
+  <text x="1018" y="660" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#8E9FA3">active procs</text>
+
+  <!-- Console Footer -->
+  <line x1="548" y1="694" x2="1152" y2="694" stroke="#222D33"/>
+  <circle cx="576" cy="712" r="4" fill="#B5F5CD"/>
+  <text x="588" y="716" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#8E9FA3">events.jsonl bridge ready · Esc to collapse</text>
+  <text x="1128" y="716" text-anchor="end" font-family="'Cascadia Mono', Consolas, monospace" font-size="11" fill="#B5F5CD">LOCAL-ONLY</text>
+</svg>

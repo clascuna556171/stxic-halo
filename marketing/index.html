@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0e12" />
+  <meta name="description" content="STXIC Halo is a local-first Windows top-edge telemetry capsule for AI coding agent sessions and host resource pressure." />
+  <title>STXIC Halo — Local Agent &amp; System Sentinel for Windows</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/brand/halo-mark.svg" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="brand" href="#top" aria-label="STXIC Halo home">
+      <img src="../assets/brand/halo-mark.svg" width="30" height="30" alt="" />
+      <span>stxic<b>halo</b></span>
+      <span class="version-tag">v0.1 PROTOTYPE</span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="#verification">Verification gap</a>
+      <a href="#architecture">Local pipeline</a>
+      <a href="#scope">Release matrix</a>
+    </nav>
+    <a class="header-link" href="../preview/halo-demo.html">
+      Launch interactive HUD
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 11.5L11.5 4.5M11.5 4.5H5.5M11.5 4.5V10.5" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+  </header>
+
+  <main id="top">
+    <section class="hero wrap">
+      <div class="hero-copy">
+        <h1>Stay in flow.<br /><em>Halo keeps watch.</em></h1>
+        <p class="intro">
+          A compact Windows top-edge instrument that tracks background AI coding sessions, approval blocks, and local CPU/RAM pressure—without leaving your editor or sending a single byte to the cloud.
+        </p>
+
+        <div class="event-specimen" aria-label="Sample sanitized hook payload">
+          <div class="specimen-bar">
+            <span class="specimen-file">%LOCALAPPDATA%\STXICHalo\events.jsonl</span>
+            <span class="specimen-status">OPT-IN LOCAL HOOK</span>
+          </div>
+          <code>{"source":"claude-code","event":"PermissionRequest","tool_name":"Bash","cwd":"C:\\Projects\\portfolio-app"}</code>
+        </div>
+
+        <div class="hero-actions">
+          <a class="btn primary" href="../preview/halo-demo.html">
+            Inspect interactive HUD
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="btn secondary" href="#architecture">How the local bridge works</a>
+        </div>
+        <p class="micro">Windows 10/11 (Tauri 2 + Rust) · Simulated demo fixtures clearly badged · Zero prompt or transcript capture</p>
+      </div>
+
+      <figure class="hero-visual">
+        <img src="../assets/mockups/halo-hero.svg" width="1200" height="780" alt="Schematic showing STXIC Halo collapsed top-edge capsule and expanded telemetry console" />
+        <figcaption>Anatomical UI specimen · Collapsed 440×56px top-edge capsule and expanded telemetry console (simulated session data)</figcaption>
+      </figure>
+    </section>
+
+    <section id="verification" class="separator">
+      <div class="wrap">
+        <div class="section-header-split">
+          <h2>"Agent stopped" does not mean your build passed.</h2>
+          <p class="section-lede">
+            Terminal bells and generic status widgets treat every <code>Stop</code> event as success. Halo separates session lifecycle from actual verification evidence so you know which workspace needs intervention first.
+          </p>
+        </div>
+
+        <div class="compare-ledger" role="region" aria-label="Signal comparison">
+          <div class="ledger-col">
+            <div class="ledger-head">
+              <span class="ledger-badge muted">ORDINARY STATUS WIDGET</span>
+              <span class="ledger-state">Ambiguous</span>
+            </div>
+            <h3>"Claude finished."</h3>
+            <ul class="ledger-list">
+              <li>Cannot distinguish a finished refactor from an aborted command or failing test suite.</li>
+              <li>Forces you to alt-tab across three terminal windows just to check if approval is waiting.</li>
+              <li>Mixes fabricated token estimates with real telemetry.</li>
+            </ul>
+          </div>
+
+          <div class="ledger-col highlight">
+            <div class="ledger-head">
+              <span class="ledger-badge mint">STXIC HALO SIGNAL</span>
+              <span class="ledger-state amber">Actionable</span>
+            </div>
+            <h3>"Claude awaiting review · 2 tests failed in portfolio-app"</h3>
+            <ul class="ledger-list">
+              <li>Surfaces the exact blocking hook event (<code>PermissionRequest · Bash</code>) in the top-edge capsule.</li>
+              <li>Explicitly labels missing provider metrics (<code>—</code>) instead of guessing context percentages.</li>
+              <li>Pairs lifecycle hooks (v0.1) with planned Git diff &amp; test runner verification (Proof-of-Work v0.2).</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="architecture" class="architecture wrap">
+      <div class="section-header-split">
+        <h2>Engineered around a verifiable local boundary.</h2>
+        <p class="section-lede">
+          Halo runs as a lightweight native Tauri/Rust process on Windows. It reads only sanitized metadata from its own local JSONL file and OS system calls.
+        </p>
+      </div>
+
+      <div class="pipeline-table" id="scope" role="table" aria-label="Architecture and delivery scope">
+        <div class="pipeline-row pipeline-header" role="row">
+          <div role="columnheader">Subsystem</div>
+          <div role="columnheader">Data source &amp; mechanism</div>
+          <div role="columnheader">Privacy boundary</div>
+          <div role="columnheader">Status</div>
+        </div>
+
+        <div class="pipeline-row" role="row">
+          <div class="col-title" role="cell">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="5.5" stroke="#B5F5CD" stroke-width="1.5"/><circle cx="8" cy="8" r="2" fill="#B5F5CD"/></svg>
+            <strong>Claude Code Hook Bridge</strong>
+          </div>
+          <div class="col-mono" role="cell">scripts/claude-hook.ps1 → %LOCALAPPDATA%\STXICHalo\events.jsonl</div>
+          <div role="cell">Captures event type, tool name, and workspace directory only. Never reads prompts or code.</div>
+          <div role="cell"><span class="availability">v0.1 Prototype</span></div>
+        </div>
+
+        <div class="pipeline-row" role="row">
+          <div class="col-title" role="cell">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="#B5F5CD" stroke-width="1.5"/><path d="M5.5 8H10.5M8 5.5V10.5" stroke="#B5F5CD" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <strong>Windows Host Telemetry</strong>
+          </div>
+          <div class="col-mono" role="cell">Rust sysinfo crate · 2,500ms polling interval</div>
+          <div role="cell">Sampled in-memory on device. Zero network sockets, accounts, or analytics beacons.</div>
+          <div role="cell"><span class="availability">v0.1 Prototype</span></div>
+        </div>
+
+        <div class="pipeline-row" role="row">
+          <div class="col-title" role="cell">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.5L6.5 12L13 4.5" stroke="#9DBFFD" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <strong>Proof-of-Work Ledger</strong>
+          </div>
+          <div class="col-mono" role="cell">Git diff stat + explicit test runner exit codes</div>
+          <div role="cell">Requires per-workspace user grant. Never auto-executes shell commands without consent.</div>
+          <div role="cell"><span class="availability future">Planned v0.2</span></div>
+        </div>
+
+        <div class="pipeline-row" role="row">
+          <div class="col-title" role="cell">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2.5L13.5 12.5H2.5L8 2.5Z" stroke="#F5C875" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            <strong>Agent Risk Radar &amp; Codex</strong>
+          </div>
+          <div class="col-mono" role="cell">Overlapping file edit detection &amp; Codex CLI adapter</div>
+          <div role="cell">Read-only conflict detection across concurrent local worktrees.</div>
+          <div role="cell"><span class="availability future">Planned v0.3</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bottom-band">
+      <div class="wrap bottom-inner">
+        <div>
+          <h2>Inspect the top-edge console right in your browser.</h2>
+          <p>
+            Test the collapsed capsule, attention banner, verification ledger, and sanitized event log in our zero-dependency interactive specimen.
+          </p>
+        </div>
+        <a class="btn primary" href="../preview/halo-demo.html">
+          Open interactive HUD
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4.5 11.5L11.5 4.5M11.5 4.5H5.5M11.5 4.5V10.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap site-footer">
+    <div class="brand">
+      <img src="../assets/brand/halo-mark.svg" width="22" height="22" alt="" />
+      <span>stxic<b>halo</b></span>
+    </div>
+    <p>Local-first Windows developer companion · MIT License · © 2026 STXIC</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "STXIC Halo",
+  "version": "0.1.0",
+  "identifier": "dev.stxic.halo",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "STXIC Halo",
+        "width": 460,
+        "height": 78,
+        "minWidth": 460,
+        "minHeight": 72,
+        "maxWidth": 460,
+        "maxHeight": 620,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": true,
+        "shadow": false,
+        "backgroundColor": "#00000000"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "publisher": "STXIC",
+    "category": "DeveloperTool",
+    "copyright": "Copyright (c) 2026 STXIC. MIT License.",
+    "shortDescription": "Local-first Windows floating workspace companion for AI coding agents",
+    "longDescription": "Monitor AI coding agent lifecycle hooks, verification evidence, and local CPU/RAM telemetry in a compact top-edge Windows HUD.",
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}
