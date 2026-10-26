@@ -1,28 +1,27 @@
 import { memo, useState } from 'react';
 import {
-  Activity,
   AlertTriangle,
   ArrowUpRight,
   Bot,
   Check,
-  CheckCheck,
   ChevronDown,
   ChevronUp,
   CircleHelp,
   Clock,
   Cpu,
   FileCode2,
-  Gamepad2,
   Gauge,
   GitBranch,
   HardDrive,
   ShieldCheck,
   TerminalSquare,
+  Zap,
 } from 'lucide-react';
 import type {
   Agent,
   AgentEvent,
   AlertItem,
+  ClaudeHookStatus,
   Metrics,
   MetricsHistorySummary,
   PerformanceStats,
@@ -31,7 +30,6 @@ import type {
 } from '../types';
 import { gib, percent, relativeTime } from '../lib/format';
 import { displayPath } from '../lib/agentEvents';
-import { UNAVAILABLE_GAMING_TELEMETRY } from '../lib/telemetryHistory';
 
 const statusLabel: Record<Agent['status'], string> = {
   working: 'Working',
@@ -46,6 +44,25 @@ const providerBadge: Record<Agent['provider'], string> = {
   codex: 'Codex',
   other: 'Agent',
 };
+
+function formatEventLabel(ev: AgentEvent): { title: string; isWarning?: boolean } {
+  switch (ev.event) {
+    case 'PermissionRequest':
+      return { title: 'Approval required', isWarning: true };
+    case 'PreToolUse':
+      return { title: ev.tool_name ? `Tool: ${ev.tool_name}` : 'Tool invoked' };
+    case 'PostToolUse':
+      return { title: ev.tool_name ? `Tool finished: ${ev.tool_name}` : 'Tool finished' };
+    case 'SessionStart':
+      return { title: 'Session started' };
+    case 'SessionEnd':
+      return { title: 'Session completed' };
+    case 'Stop':
+      return { title: 'Agent paused' };
+    default:
+      return { title: ev.event };
+  }
+}
 
 export const AgentCard = memo(function AgentCard({ agent }: { agent: Agent }) {
   const Icon = agent.provider === 'codex' ? TerminalSquare : Bot;
@@ -257,6 +274,9 @@ export const Overview = memo(function Overview({
   onReview,
   onAcknowledgeAlert,
   onConnect,
+  claudeHookStatus,
+  onEnableClaudeHook,
+  hookLoading,
 }: {
   agents: Agent[];
   alerts: AlertItem[];
@@ -266,6 +286,9 @@ export const Overview = memo(function Overview({
   onReview: () => void;
   onAcknowledgeAlert?: (key: string) => void;
   onConnect: () => void;
+  claudeHookStatus?: ClaudeHookStatus | null;
+  onEnableClaudeHook?: () => Promise<unknown>;
+  hookLoading?: boolean;
 }) {
   const leadAlert = alerts[0];
   const working = agents.filter((a) => a.status === 'working').length;
@@ -283,7 +306,7 @@ export const Overview = memo(function Overview({
       <div className="section-heading first-heading">
         <h2>Active sessions</h2>
         <span className="subtle-label tabular">
-          {working} working · {agents.length} monitored
+          {working > 0 ? `${working} active` : 'Standby'} · {agents.length} monitored
         </span>
       </div>
 
@@ -295,30 +318,43 @@ export const Overview = memo(function Overview({
         </div>
       ) : (
         <div className="empty-state">
-          <Bot size={22} />
-          <strong>No active agent sessions detected</strong>
-          <p>Halo is actively monitoring local Claude Code and Codex hooks. When an agent runs in your workspace, real-time lifecycle and telemetry will stream here.</p>
-          <button type="button" onClick={onConnect}>
-            Configure hook bridge <ArrowUpRight size={13} />
-          </button>
+          <Bot size={24} />
+          <strong>Waiting for agent session</strong>
+          {claudeHookStatus?.installed ? (
+            <p>
+              Claude Code bridge is <strong>ready</strong>. Run a task in your terminal (<code>claude</code>) to see live progress, tool calls, and test results stream here.
+            </p>
+          ) : (
+            <>
+              <p>
+                Connect Claude Code to stream live agent progress, tool calls, and approval prompts into this Dynamic Island.
+              </p>
+              {onEnableClaudeHook ? (
+                <button
+                  type="button"
+                  disabled={hookLoading}
+                  onClick={() => void onEnableClaudeHook()}
+                >
+                  <Zap size={13} /> {hookLoading ? 'Connecting...' : 'Connect Claude Code (1-Click)'}
+                </button>
+              ) : (
+                <button type="button" onClick={onConnect}>
+                  Open Settings <ArrowUpRight size={13} />
+                </button>
+              )}
+            </>
+          )}
         </div>
       )}
 
       <div className="section-heading">
         <h2>Host telemetry</h2>
         <span className="subtle-label tabular">
-          {demo ? 'Diagnostic simulation' : 'Rust sysinfo · local'}
+          {demo ? 'Diagnostic simulation' : 'Local hardware'}
         </span>
       </div>
 
       <MetricStrip metrics={metrics} demo={demo} pollIntervalMs={pollIntervalMs} />
-
-      <p className="section-note">
-        <CheckCheck size={13} />
-        <span>
-          Zero-cloud local companion. Reads local sysinfo and authorized workspace Git/test proof claims.
-        </span>
-      </p>
     </div>
   );
 });
@@ -346,12 +382,11 @@ export const SystemView = memo(function SystemView({
       : 0;
 
   const cpuBars = history?.cpuSamples ?? [];
-  const gaming = UNAVAILABLE_GAMING_TELEMETRY;
 
   return (
     <div className="section-scroll" aria-label="System telemetry">
       <div className="section-heading first-heading">
-        <h2>Local machine resources</h2>
+        <h2>Machine resources</h2>
         <span className="subtle-label tabular">
           {demo ? 'Sample data' : `${pollIntervalMs}ms interval`}
         </span>
@@ -384,8 +419,8 @@ export const SystemView = memo(function SystemView({
         )}
         <p className="stat-secondary">
           {demo
-            ? 'Simulated workload reading'
-            : `Sampled via Rust sysinfo (${metrics?.sample_duration_ms ?? 1}ms sample latency)`}
+            ? 'Simulated workload sample'
+            : `Hardware sysinfo sample (${metrics?.sample_duration_ms ?? 1}ms latency)`}
         </p>
       </div>
 
@@ -405,25 +440,30 @@ export const SystemView = memo(function SystemView({
         </p>
       </div>
 
+      <div className="section-heading">
+        <h2>Process &amp; CLI monitors</h2>
+        <span className="subtle-label tabular">
+          {metrics ? `${metrics.process_count} OS processes` : 'Active'}
+        </span>
+      </div>
+
       <div className="stat-panel tabular">
         <div className="stat-top">
-          <Activity size={15} />
-          <span>Active OS processes</span>
-          <strong>{metrics ? metrics.process_count : '—'}</strong>
+          <TerminalSquare size={15} />
+          <span>Detected AI Agent CLIs</span>
+          <strong>
+            {(processLifecycle?.claude_processes ?? 0) + (processLifecycle?.codex_processes ?? 0) > 0
+              ? `${(processLifecycle?.claude_processes ?? 0) + (processLifecycle?.codex_processes ?? 0)} running`
+              : 'Idle'}
+          </strong>
         </div>
         <p className="stat-secondary">
-          Process table enumeration is throttled to 10s intervals in Rust to minimize Windows handle
-          overhead.
-          {processLifecycle?.available && (
-            <span style={{ display: 'block', marginTop: '4px', color: 'var(--text)' }}>
-              Detected provider CLIs: {processLifecycle.claude_processes} Claude · {processLifecycle.codex_processes} Codex
-            </span>
-          )}
+          Claude Code: <strong>{processLifecycle?.claude_processes ?? 0} active</strong> · Codex: <strong>{processLifecycle?.codex_processes ?? 0} active</strong>
         </p>
       </div>
 
       <div className="section-heading">
-        <h2>Performance instrumentation</h2>
+        <h2>Halo sentinel health</h2>
         <span className="subtle-label tabular">
           {perfStats ? `Uptime ${perfStats.uptime_secs}s` : 'Local audit'}
         </span>
@@ -431,8 +471,8 @@ export const SystemView = memo(function SystemView({
 
       <div className="stat-panel tabular">
         <div className="stat-top">
-          <Gauge size={15} />
-          <span>STXIC Halo footprint &amp; latency</span>
+          <ShieldCheck size={15} className="mint-text" />
+          <span>Sentinel footprint</span>
           <strong>
             {perfStats?.footprint.available
               ? `${gib(perfStats.footprint.memory_bytes)} RAM`
@@ -448,10 +488,10 @@ export const SystemView = memo(function SystemView({
           )}
           {pollSummary && pollSummary.samples > 0 ? (
             <span>
-              UI IPC poll latency: avg {pollSummary.avgMs}ms · p95 {pollSummary.p95Ms}ms ({pollSummary.samples} samples)
+              IPC response latency: avg {pollSummary.avgMs}ms · p95 {pollSummary.p95Ms}ms
             </span>
           ) : (
-            <span>Collecting IPC round-trip latency samples...</span>
+            <span>Collecting IPC round-trip latency...</span>
           )}
           {perfStats?.leak_analysis && (
             <span
@@ -461,44 +501,9 @@ export const SystemView = memo(function SystemView({
                 color: perfStats.leak_analysis.suspected_leak ? '#cf222e' : 'var(--status-working, #3fb950)',
               }}
             >
-              <ShieldCheck size={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '4px' }} />
-              {perfStats.leak_analysis.status}
+              ✓ {perfStats.leak_analysis.status}
             </span>
           )}
-        </p>
-
-        {perfStats && Object.keys(perfStats.timings).length > 0 && (
-          <table className="perf-table" aria-label="Rust operation timings">
-            <thead>
-              <tr>
-                <th>Operation</th>
-                <th style={{ textAlign: 'right' }}>Calls</th>
-                <th style={{ textAlign: 'right' }}>Avg</th>
-                <th style={{ textAlign: 'right' }}>Max</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(perfStats.timings).map(([op, stat]) => (
-                <tr key={op}>
-                  <td><code>{op}</code></td>
-                  <td className="num">{stat.count}</td>
-                  <td className="num">{stat.avg_ms.toFixed(2)}ms</td>
-                  <td className="num">{stat.max_ms.toFixed(2)}ms</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="stat-panel tabular">
-        <div className="stat-top">
-          <Gamepad2 size={15} />
-          <span>Direct3D &amp; GPU interface</span>
-          <strong className="muted">{gaming.available ? `${gaming.fps} FPS` : 'Standby'}</strong>
-        </div>
-        <p className="stat-secondary">
-          DXGI / PresentMon telemetry profile registered. Low-intrusion anti-cheat compliant mode active.
         </p>
       </div>
     </div>
@@ -533,9 +538,9 @@ export const ActivityView = memo(function ActivityView({
   return (
     <div className="section-scroll" aria-label="Verification and event log">
       <div className="section-heading first-heading">
-        <h2>Proof-of-Work ledger</h2>
+        <h2>Code changes &amp; verifications</h2>
         <span className="subtle-label tabular">
-          {demo ? 'Unverified sample' : 'Evidence & Provenance'}
+          {demo ? 'Sample verification' : 'Verified tasks'}
         </span>
       </div>
 
@@ -551,6 +556,14 @@ export const ActivityView = memo(function ActivityView({
           const isFilesExpanded = expandedFileAgentId === agent.id;
           const isVerifyingGit = verifyingAction === `${agent.workspace}:git`;
           const isVerifyingTest = verifyingAction === `${agent.workspace}:test`;
+
+          const badgeLabel = agent.isDemo
+            ? 'Sample'
+            : proof?.verified
+              ? 'All Tests Passed'
+              : failedCount && failedCount > 0
+                ? `${failedCount} Failed`
+                : 'Git Changes';
 
           return (
             <div className="activity-card" key={agent.id}>
@@ -569,10 +582,10 @@ export const ActivityView = memo(function ActivityView({
                   )}
                 </div>
                 <span
-                  className={`verify-badge ${agent.isDemo ? 'fixture' : proof?.verified ? 'verified' : 'unverified'}`}
+                  className={`verify-badge ${agent.isDemo ? 'fixture' : proof?.verified ? 'verified' : failedCount && failedCount > 0 ? 'failed' : 'unverified'}`}
                 >
                   {!agent.isDemo && proof?.verified && <ShieldCheck size={11} />}
-                  {agent.isDemo ? 'Fixture' : proof?.verified ? 'Verified' : 'Unverified'}
+                  {badgeLabel}
                 </span>
               </div>
 
@@ -602,7 +615,7 @@ export const ActivityView = memo(function ActivityView({
                       <strong>{changedCount ?? '—'}</strong>
                       {git && (
                         <span style={{ fontSize: '9px', color: 'var(--muted)' }}>
-                          {git.staged_count}S · {git.modified_count}M · {git.untracked_count}U
+                          {git.modified_count}M · {git.staged_count}S · {git.untracked_count}U
                         </span>
                       )}
                     </div>
@@ -694,7 +707,7 @@ export const ActivityView = memo(function ActivityView({
                       }}
                     >
                       {proof.provenance ??
-                        (agent.isDemo ? 'Sample fixture provenance' : 'Local inspection')}
+                        (agent.isDemo ? 'Sample provenance' : 'Local inspection')}
                     </span>
                     {timestamp ? (
                       <span className="tabular" style={{ flexShrink: 0 }}>
@@ -706,7 +719,7 @@ export const ActivityView = memo(function ActivityView({
                 </>
               ) : (
                 <div className="no-proof">
-                  Lifecycle hook only — no Git diff or test runner attached to this session.
+                  Lifecycle hook active — no Git diff or test runner attached to this session.
                 </div>
               )}
 
@@ -738,31 +751,33 @@ export const ActivityView = memo(function ActivityView({
       ) : (
         <div className="empty-state">
           <FileCode2 size={22} />
-          <strong>Proof-of-Work ledger ready</strong>
-          <p>Cryptographic evidence, changed files, and test runner outputs will be cataloged here as agents execute tasks.</p>
+          <strong>No verifications recorded yet</strong>
+          <p>When agents modify files or run test suites in authorized folders, diffs and test results appear here.</p>
         </div>
       )}
 
       <div className="section-heading">
-        <h2>Sanitized hook events (events.jsonl)</h2>
-        <span className="subtle-label tabular">{events.length} recent</span>
+        <h2>Recent agent activity</h2>
+        <span className="subtle-label tabular">{events.length} actions</span>
       </div>
 
       {events.length ? (
-        <div className="event-log tabular" role="log" aria-label="Recent sanitized hook events">
-          {events.slice(0, 8).map((ev, idx) => (
-            <div className="event-row" key={`${ev.session_id}-${ev.event}-${idx}`}>
-              <span className={`event-type ${ev.event === 'PermissionRequest' ? 'amber' : ''}`}>
-                {ev.event}
-              </span>
-              {ev.tool_name && <span className="event-tool">{ev.tool_name}</span>}
-              <span className="event-cwd">{ev.cwd ? displayPath(ev.cwd) : ev.source}</span>
-              <span className="event-time">{demo ? 'sample' : relativeTime(ev.timestamp)}</span>
-            </div>
-          ))}
+        <div className="event-log tabular" role="log" aria-label="Recent agent activity">
+          {events.slice(0, 8).map((ev, idx) => {
+            const formatted = formatEventLabel(ev);
+            return (
+              <div className="event-row" key={`${ev.session_id}-${ev.event}-${idx}`}>
+                <span className={`event-type ${formatted.isWarning ? 'amber' : ''}`}>
+                  {formatted.title}
+                </span>
+                <span className="event-cwd">{ev.cwd ? displayPath(ev.cwd) : ev.source}</span>
+                <span className="event-time">{demo ? 'sample' : relativeTime(ev.timestamp)}</span>
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <div className="no-proof">No raw JSONL hook events recorded yet.</div>
+        <div className="no-proof">No recent agent actions recorded. When an agent runs, tool calls and timeline events appear here.</div>
       )}
     </div>
   );
