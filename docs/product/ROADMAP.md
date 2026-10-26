@@ -24,13 +24,13 @@ Schedule estimate for a single motivated Windows/TypeScript/Rust developer: 8–
 **Exit criteria met:** stable 24-hour multi-session monitoring, zero-cloud local telemetry, process lifecycle cross-checking, single-instance protection, Windows autostart toggle, and schema v2 settings with backup/quarantine error recovery.
 
 ## Phase 2 — Real differentiation (weeks 6–8)
-- [ ] Explicit workspace grants and Git status/diff summaries.
-- [ ] Opt-in test results ingestion; attach log provenance.
-- [ ] Proof-of-Work panel with no fake 'verified' state.
-- [ ] Codex adapter based on supported protocol or safe versioned log schema.
-- [ ] Conflict rule for two verified sessions changing the same workspace/file.
+- [x] Explicit workspace grants and Git status/diff summaries.
+- [x] Opt-in test results ingestion; attach log provenance.
+- [x] Proof-of-Work panel with no fake 'verified' state.
+- [x] Codex adapter based on supported protocol or safe versioned log schema.
+- [x] Conflict rule for two verified sessions changing the same workspace/file.
 
-**Exit:** user can see changed-file summary, passed/failed tests, which source reported each result, and evidence age.
+**Exit criteria met:** user can see changed-file summary (staged/modified/untracked breakdown and file list), passed/failed tests with duration, which source reported each result, evidence age, and concurrent workspace collision detection.
 
 ## Phase 3 — Beta / Store readiness (weeks 9–12)
 - [ ] Background idle resource profiling and leak tests.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildAlertKey,
   claudeCodeAdapter,
+  detectWorkspaceConflicts,
   displayPath,
   isSessionStale,
   notificationPolicy,
@@ -82,5 +83,37 @@ describe('hook adapter & session reducer', () => {
     const updatedAgent = { ...demoAgents[0], lastSeen: '2026-10-25T12:00:00Z' };
     const afterNewEvent = notificationPolicy.evaluate([updatedAgent], settings, new Set([ackKey]));
     expect(afterNewEvent).toHaveLength(1);
+  });
+
+  it('detects concurrent workspace collisions and raises conflict alerts', () => {
+    const agentA = {
+      ...demoAgents[0],
+      isDemo: false,
+      id: 'session-a',
+      name: 'Claude Alpha',
+      status: 'working' as const,
+      workspace: 'C:\\Projects\\shared-repo',
+    };
+    const agentB = {
+      ...demoAgents[0],
+      isDemo: false,
+      id: 'session-b',
+      name: 'Codex Beta',
+      provider: 'codex' as const,
+      status: 'working' as const,
+      workspace: 'C:\\Projects\\shared-repo\\', // trailing slash normalized
+    };
+
+    const conflicts = detectWorkspaceConflicts([agentA, agentB]);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].session_ids).toEqual(['session-a', 'session-b']);
+    expect(conflicts[0].providers).toContain('claude-code');
+    expect(conflicts[0].providers).toContain('codex');
+
+    const settings = { alert_on_waiting: false, alert_on_failure: false };
+    const alerts = notificationPolicy.evaluate([agentA, agentB], settings, new Set());
+    expect(alerts.some((al) => al.reason === 'workspace-conflict')).toBe(true);
+    const conflictAlert = alerts.find((al) => al.reason === 'workspace-conflict');
+    expect(conflictAlert?.headline).toContain('Claude Alpha & Codex Beta');
   });
 });

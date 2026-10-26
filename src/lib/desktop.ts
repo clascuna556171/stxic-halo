@@ -49,11 +49,27 @@ export async function verifyProofOfWork(
   if (!isTauri()) {
     throw new Error('Proof-of-Work inspection requires native desktop environment');
   }
-  return invoke<ProofSummary>('verify_proof_of_work', {
+  const raw = await invoke<Record<string, unknown>>('verify_proof_of_work', {
     workspacePath,
     runTests: options?.runTests ?? false,
     testProfile: options?.testProfile,
   });
+
+  return {
+    changedFiles: (raw.changed_files as number | null) ?? (raw.changedFiles as number | null) ?? null,
+    changed_files: (raw.changed_files as number | null) ?? (raw.changedFiles as number | null) ?? null,
+    testsPassed: (raw.tests_passed as number | null) ?? (raw.testsPassed as number | null) ?? null,
+    tests_passed: (raw.tests_passed as number | null) ?? (raw.testsPassed as number | null) ?? null,
+    testsFailed: (raw.tests_failed as number | null) ?? (raw.testsFailed as number | null) ?? null,
+    tests_failed: (raw.tests_failed as number | null) ?? (raw.testsFailed as number | null) ?? null,
+    verified: Boolean(raw.verified),
+    git: (raw.git as ProofSummary['git']) ?? null,
+    testSummary: (raw.test_summary as ProofSummary['testSummary']) ?? (raw.testSummary as ProofSummary['testSummary']) ?? null,
+    test_summary: (raw.test_summary as ProofSummary['testSummary']) ?? (raw.testSummary as ProofSummary['testSummary']) ?? null,
+    provenance: (raw.provenance as string) ?? undefined,
+    evidenceTimestamp: (raw.evidence_timestamp as number) ?? (raw.evidenceTimestamp as number) ?? undefined,
+    evidence_timestamp: (raw.evidence_timestamp as number) ?? (raw.evidenceTimestamp as number) ?? undefined,
+  };
 }
 
 export async function approveWorkspace(workspacePath: string): Promise<UserSettings> {

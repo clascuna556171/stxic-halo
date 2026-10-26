@@ -4,6 +4,7 @@ import {
   isWorkspaceApproved,
   LocalGitProofOfWorkVerifier,
   parseGitStatusPorcelain,
+  parseGitStatusSummary,
 } from '../src/lib/proofOfWork';
 
 describe('Proof of Work: Allowlisted Test Profiles & Git Porcelain Parser', () => {
@@ -33,6 +34,38 @@ D  old_script.ps1
     expect(parseGitStatusPorcelain(porcelainSample)).toBe(5);
     expect(parseGitStatusPorcelain('')).toBe(0);
     expect(parseGitStatusPorcelain('   \n\n\r\n')).toBe(0);
+  });
+
+  it('parses structured git status summary including branch and file statuses', () => {
+    const porcelainSample = `## main...origin/main [ahead 1]
+ M src/App.tsx
+M  src-tauri/src/lib.rs
+?? new_component.tsx
+D  old_file.ts
+`;
+    const summary = parseGitStatusSummary(porcelainSample);
+    expect(summary.branch).toBe('main');
+    expect(summary.clean).toBe(false);
+    expect(summary.total_changed).toBe(4);
+    expect(summary.staged_count).toBe(2);
+    expect(summary.modified_count).toBe(1);
+    expect(summary.untracked_count).toBe(1);
+    expect(summary.files).toHaveLength(4);
+    expect(summary.files[0]).toEqual({
+      path: 'src/App.tsx',
+      status: 'modified (M)',
+      staged: false,
+    });
+    expect(summary.files[1]).toEqual({
+      path: 'src-tauri/src/lib.rs',
+      status: 'staged (M)',
+      staged: true,
+    });
+    expect(summary.files[2]).toEqual({
+      path: 'new_component.tsx',
+      status: 'untracked',
+      staged: false,
+    });
   });
 
   it('checks user-approved workspace boundaries with path normalization', () => {
@@ -77,7 +110,7 @@ describe('ProofOfWorkVerifierContract implementation', () => {
     ).rejects.toThrow(/not allowlisted/);
   });
 
-  it('verifies an approved workspace with an allowlisted test runner', async () => {
+  it('enforces truth-over-vibes: browser mock mode never grants verified status or fake test passes', async () => {
     const verifier = new LocalGitProofOfWorkVerifier(['C:\\my-project']);
 
     const result = await verifier.verifyWorkspace('C:\\my-project', {
@@ -86,8 +119,8 @@ describe('ProofOfWorkVerifierContract implementation', () => {
     });
 
     expect(result).not.toBeNull();
-    expect(result?.verified).toBe(true);
-    expect(result?.testsPassed).toBe(1);
-    expect(result?.testsFailed).toBe(0);
+    expect(result?.verified).toBe(false);
+    expect(result?.testsPassed).toBeNull();
+    expect(result?.provenance).toContain('unverified');
   });
 });

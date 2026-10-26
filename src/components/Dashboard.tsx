@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -6,11 +6,15 @@ import {
   Bot,
   Check,
   CheckCheck,
+  ChevronDown,
+  ChevronUp,
   CircleHelp,
+  Clock,
   Cpu,
   FileCode2,
   Gamepad2,
   Gauge,
+  GitBranch,
   HardDrive,
   TerminalSquare,
 } from 'lucide-react';
@@ -130,7 +134,7 @@ export const AttentionCard = memo(function AttentionCard({
       <div className="attention-top">
         <div className="attention-heading">
           <AlertTriangle size={14} />
-          <span>ACTION REQUIRED</span>
+          <span>{alert.reason === 'workspace-conflict' ? 'WORKSPACE COLLISION' : 'ACTION REQUIRED'}</span>
         </div>
         <span className="attention-source tabular">
           {agent.workspace} · {agent.isDemo ? 'DEMO FIXTURE' : 'LIVE HOOK'}
@@ -480,71 +484,224 @@ export const ActivityView = memo(function ActivityView({
   demo: boolean;
   onVerifyWorkspace?: (workspace: string, runTests: boolean) => Promise<unknown>;
 }) {
+  const [expandedFileAgentId, setExpandedFileAgentId] = useState<string | null>(null);
+  const [verifyingAction, setVerifyingAction] = useState<string | null>(null);
+
+  const handleVerify = async (workspace: string, runTests: boolean) => {
+    if (!onVerifyWorkspace) return;
+    const actionKey = `${workspace}:${runTests ? 'test' : 'git'}`;
+    setVerifyingAction(actionKey);
+    try {
+      await onVerifyWorkspace(workspace, runTests);
+    } finally {
+      setVerifyingAction(null);
+    }
+  };
+
   return (
     <div className="section-scroll" aria-label="Verification and event log">
       <div className="section-heading first-heading">
-        <h2>Verification ledger</h2>
+        <h2>Proof-of-Work ledger</h2>
         <span className="subtle-label tabular">
-          {demo ? 'Unverified sample' : 'Hook provenance'}
+          {demo ? 'Unverified sample' : 'Evidence & Provenance'}
         </span>
       </div>
 
       {agents.length ? (
-        agents.map((agent) => (
-          <div className="activity-card" key={agent.id}>
-            <div className="agent-head">
-              <div className="agent-identity">
-                <FileCode2 size={15} />
-                <strong>{agent.name}</strong>
-                <span className="workspace-tag">{agent.workspace}</span>
+        agents.map((agent) => {
+          const proof = agent.proof;
+          const git = proof?.git;
+          const test = proof?.testSummary ?? proof?.test_summary;
+          const timestamp = proof?.evidenceTimestamp ?? proof?.evidence_timestamp;
+          const changedCount = proof?.changedFiles ?? proof?.changed_files;
+          const passedCount = proof?.testsPassed ?? proof?.tests_passed;
+          const failedCount = proof?.testsFailed ?? proof?.tests_failed;
+          const isFilesExpanded = expandedFileAgentId === agent.id;
+          const isVerifyingGit = verifyingAction === `${agent.workspace}:git`;
+          const isVerifyingTest = verifyingAction === `${agent.workspace}:test`;
+
+          return (
+            <div className="activity-card" key={agent.id}>
+              <div className="agent-head">
+                <div className="agent-identity">
+                  <FileCode2 size={15} />
+                  <strong>{agent.name}</strong>
+                  <span className="workspace-tag" title={agent.workspace}>
+                    {agent.workspace}
+                  </span>
+                  {git?.branch && (
+                    <span className="workspace-tag tabular" title={`Git branch: ${git.branch}`}>
+                      <GitBranch size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                      {git.branch}
+                    </span>
+                  )}
+                </div>
+                <span
+                  className={`verify-badge ${agent.isDemo ? 'fixture' : proof?.verified ? 'verified' : 'unverified'}`}
+                >
+                  {agent.isDemo ? 'FIXTURE' : proof?.verified ? 'VERIFIED' : 'UNVERIFIED'}
+                </span>
               </div>
-              <span className={`verify-badge ${agent.proof?.verified ? 'verified' : 'unverified'}`}>
-                {agent.proof?.verified ? 'VERIFIED' : 'UNVERIFIED'}
-              </span>
+
+              <p className="task-description">{agent.task}</p>
+
+              {proof ? (
+                <>
+                  {!proof.verified && (
+                    <p
+                      style={{
+                        margin: '3px 0 7px',
+                        fontSize: '10.5px',
+                        color: failedCount && failedCount > 0 ? 'var(--amber)' : 'var(--muted)',
+                      }}
+                    >
+                      {failedCount && failedCount > 0
+                        ? `Failure: ${failedCount} test(s) failed in allowlisted verification`
+                        : passedCount === null
+                          ? 'Git changes detected · No allowlisted test profile executed'
+                          : 'Test suite inconclusive or 0 tests evaluated'}
+                    </p>
+                  )}
+
+                  <div className="verification-grid tabular">
+                    <div>
+                      <span>Files Δ</span>
+                      <strong>{changedCount ?? '—'}</strong>
+                      {git && (
+                        <span style={{ fontSize: '9px', color: 'var(--muted)' }}>
+                          {git.staged_count}S · {git.modified_count}M · {git.untracked_count}U
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span>Tests passed</span>
+                      <strong className="mint-text">{passedCount ?? '—'}</strong>
+                      {test?.duration_ms && (
+                        <span style={{ fontSize: '9px', color: 'var(--muted)' }}>
+                          {(test.duration_ms / 1000).toFixed(2)}s
+                        </span>
+                      )}
+                    </div>
+                    <div>
+                      <span>Tests failed</span>
+                      <strong className={failedCount && failedCount > 0 ? 'amber-text' : ''}>
+                        {failedCount ?? '—'}
+                      </strong>
+                      {test?.runner && (
+                        <span
+                          style={{
+                            fontSize: '9px',
+                            color: 'var(--muted)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {test.runner}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {git?.files && git.files.length > 0 && (
+                    <div style={{ marginTop: '8px' }}>
+                      <button
+                        type="button"
+                        className="inline-action subtle-action"
+                        style={{ fontSize: '10.5px', padding: '3px 7px' }}
+                        onClick={() =>
+                          setExpandedFileAgentId(isFilesExpanded ? null : agent.id)
+                        }
+                      >
+                        {isFilesExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                        <span>
+                          {isFilesExpanded
+                            ? 'Hide changed files'
+                            : `View changed files (${git.files.length})`}
+                        </span>
+                      </button>
+
+                      {isFilesExpanded && (
+                        <div
+                          className="changed-files-box"
+                          role="region"
+                          aria-label="Changed files list"
+                        >
+                          {git.files.map((f) => (
+                            <div className="file-row" key={f.path}>
+                              <span
+                                className={`file-tag ${
+                                  f.status.includes('staged')
+                                    ? 'staged'
+                                    : f.status.includes('untracked')
+                                      ? 'untracked'
+                                      : 'modified'
+                                }`}
+                              >
+                                {f.status}
+                              </span>
+                              <span className="file-path" title={f.path}>
+                                {f.path}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="evidence-provenance-bar">
+                    <span
+                      title={proof.provenance ?? ''}
+                      style={{
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '75%',
+                      }}
+                    >
+                      {proof.provenance ??
+                        (agent.isDemo ? 'Sample fixture provenance' : 'Local inspection')}
+                    </span>
+                    {timestamp ? (
+                      <span className="tabular" style={{ flexShrink: 0 }}>
+                        <Clock size={10} style={{ marginRight: 3, verticalAlign: 'middle' }} />
+                        {relativeTime(new Date(timestamp).toISOString())}
+                      </span>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <div className="no-proof">
+                  Lifecycle hook only — no Git diff or test runner attached to this session.
+                </div>
+              )}
+
+              {onVerifyWorkspace && !agent.isDemo && (
+                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    className="inline-action subtle-action"
+                    disabled={Boolean(verifyingAction)}
+                    onClick={() => handleVerify(agent.workspace, false)}
+                    title="Inspect git status --porcelain for changes"
+                  >
+                    {isVerifyingGit ? 'Inspecting...' : 'Verify Git Δ'}
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-action subtle-action"
+                    disabled={Boolean(verifyingAction)}
+                    onClick={() => handleVerify(agent.workspace, true)}
+                    title="Run allowlisted test profile (npm test)"
+                  >
+                    {isVerifyingTest ? 'Running...' : 'Run Tests'}
+                  </button>
+                </div>
+              )}
             </div>
-            <p className="task-description">{agent.task}</p>
-            {agent.proof ? (
-              <div className="verification-grid tabular">
-                <div>
-                  <span>Files Δ</span>
-                  <strong>{agent.proof.changedFiles ?? '—'}</strong>
-                </div>
-                <div>
-                  <span>Tests passed</span>
-                  <strong className="mint-text">{agent.proof.testsPassed ?? '—'}</strong>
-                </div>
-                <div>
-                  <span>Tests failed</span>
-                  <strong className="amber-text">{agent.proof.testsFailed ?? '—'}</strong>
-                </div>
-              </div>
-            ) : (
-              <div className="no-proof">
-                Lifecycle hook only — no Git diff or test runner attached to this session.
-              </div>
-            )}
-            {onVerifyWorkspace && !agent.isDemo && (
-              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  className="inline-action subtle-action"
-                  onClick={() => onVerifyWorkspace(agent.workspace, false)}
-                  title="Inspect git status --porcelain for changes"
-                >
-                  Verify Git Δ
-                </button>
-                <button
-                  type="button"
-                  className="inline-action subtle-action"
-                  onClick={() => onVerifyWorkspace(agent.workspace, true)}
-                  title="Run allowlisted test profile (npm test)"
-                >
-                  Run Tests
-                </button>
-              </div>
-            )}
-          </div>
-        ))
+          );
+        })
       ) : (
         <div className="empty-state">
           <FileCode2 size={22} />

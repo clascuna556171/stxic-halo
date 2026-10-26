@@ -1,5 +1,10 @@
 import { isDesktop, verifyProofOfWork } from './desktop';
-import type { ProofOfWorkVerifierContract, ProofSummary } from '../types';
+import type {
+  GitFileChange,
+  GitStatusSummary,
+  ProofOfWorkVerifierContract,
+  ProofSummary,
+} from '../types';
 
 export const ALLOWLISTED_TEST_PROFILES = [
   'npm test',
@@ -20,7 +25,76 @@ export function parseGitStatusPorcelain(output: string): number {
   return output
     .split('\n')
     .map((line) => line.trim())
-    .filter((line) => line.length > 0).length;
+    .filter((line) => line.length > 0 && !line.startsWith('##')).length;
+}
+
+export function parseGitStatusSummary(output: string): GitStatusSummary {
+  let branch: string | null = null;
+  const files: GitFileChange[] = [];
+  let stagedCount = 0;
+  let modifiedCount = 0;
+  let untrackedCount = 0;
+
+  for (const rawLine of output.split('\n')) {
+    const line = rawLine.trimEnd();
+    if (!line.trim()) continue;
+
+    if (line.startsWith('## ')) {
+      const b = line.slice(3).trim();
+      const dotIdx = b.indexOf('...');
+      const spaceIdx = b.indexOf(' ');
+      if (dotIdx !== -1) {
+        branch = b.slice(0, dotIdx);
+      } else if (spaceIdx !== -1) {
+        branch = b.slice(0, spaceIdx);
+      } else {
+        branch = b;
+      }
+      continue;
+    }
+
+    if (line.length < 3) continue;
+
+    const x = line[0] ?? ' ';
+    const y = line[1] ?? ' ';
+    const path = line.slice(3).trim().replace(/^"|"$/g, '');
+
+    const isUntracked = x === '?' && y === '?';
+    const isStaged = x !== ' ' && x !== '?';
+    const isUnstaged = y !== ' ' && y !== '?';
+
+    let statusDesc = 'unchanged';
+    if (isUntracked) {
+      untrackedCount++;
+      statusDesc = 'untracked';
+    } else {
+      if (isStaged) stagedCount++;
+      if (isUnstaged) modifiedCount++;
+      if (isStaged && isUnstaged) {
+        statusDesc = 'staged+modified';
+      } else if (isStaged) {
+        statusDesc = `staged (${x})`;
+      } else if (isUnstaged) {
+        statusDesc = `modified (${y})`;
+      }
+    }
+
+    files.push({
+      path,
+      status: statusDesc,
+      staged: isStaged,
+    });
+  }
+
+  return {
+    branch,
+    clean: files.length === 0,
+    total_changed: files.length,
+    staged_count: stagedCount,
+    modified_count: modifiedCount,
+    untracked_count: untrackedCount,
+    files,
+  };
 }
 
 export function isWorkspaceApproved(
@@ -86,12 +160,29 @@ export class LocalGitProofOfWorkVerifier implements ProofOfWorkVerifierContract 
       return verifyProofOfWork(workspacePath, options);
     }
 
-    // In browser preview / mock mode with approved workspace:
+    // In browser preview / mock mode (non-Tauri):
+    // Strict truth-over-vibes: mock mode never claims real verification or fake passed tests.
     return {
       changedFiles: 0,
-      testsPassed: options?.runTests ? 1 : null,
-      testsFailed: options?.runTests ? 0 : null,
-      verified: Boolean(options?.runTests),
+      changed_files: 0,
+      testsPassed: null,
+      tests_passed: null,
+      testsFailed: null,
+      tests_failed: null,
+      verified: false,
+      git: {
+        branch: 'mock',
+        clean: true,
+        total_changed: 0,
+        staged_count: 0,
+        modified_count: 0,
+        untracked_count: 0,
+        files: [],
+      },
+      provenance:
+        'Browser preview mock — native desktop runner required for verification (unverified)',
+      evidenceTimestamp: Date.now(),
+      evidence_timestamp: Date.now(),
     };
   }
 }

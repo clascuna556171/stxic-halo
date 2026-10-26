@@ -7,6 +7,7 @@ import type {
   NotificationPolicyContract,
   Provider,
   UserSettings,
+  WorkspaceConflict,
 } from '../types';
 
 const EVENT_STATUS: Record<string, AgentStatus> = {
@@ -137,6 +138,63 @@ export function buildAlertKey(agent: Agent): string {
   return `${agent.id}:${agent.status}:${failed}:${agent.lastSeen}`;
 }
 
+export function normalizeWorkspacePath(path: string): string {
+  return path.trim().toLowerCase().replace(/\\/g, '/').replace(/\/+$/, '');
+}
+
+export function detectWorkspaceConflicts(agents: Agent[]): WorkspaceConflict[] {
+  const active = agents.filter(
+    (a) => !a.isDemo && (a.status === 'working' || a.status === 'waiting')
+  );
+  const byWorkspace = new Map<string, Agent[]>();
+
+  for (const agent of active) {
+    const raw = agent.workspacePath || agent.workspace;
+    const key = normalizeWorkspacePath(raw);
+    if (!key) continue;
+    const group = byWorkspace.get(key) ?? [];
+    group.push(agent);
+    byWorkspace.set(key, group);
+  }
+
+  const conflicts: WorkspaceConflict[] = [];
+
+  for (const [, group] of byWorkspace.entries()) {
+    if (group.length > 1) {
+      const session_ids = group.map((a) => a.id);
+      const session_names = group.map((a) => a.name);
+      const providers = Array.from(new Set(group.map((a) => a.provider)));
+
+      const fileSets = group.map(
+        (a) => new Set((a.proof?.git?.files ?? []).map((f) => f.path.toLowerCase()))
+      );
+      const intersectingFiles: string[] = [];
+      if (fileSets.length >= 2 && fileSets[0].size > 0 && fileSets[1].size > 0) {
+        for (const f of fileSets[0]) {
+          if (fileSets.slice(1).some((s) => s.has(f))) {
+            intersectingFiles.push(f);
+          }
+        }
+      }
+
+      const detail =
+        intersectingFiles.length > 0
+          ? `${session_names.join(' and ')} are concurrently modifying ${intersectingFiles.length} common file${intersectingFiles.length === 1 ? '' : 's'} (${intersectingFiles.slice(0, 3).join(', ')}) in ${group[0].workspace}.`
+          : `${session_names.join(' and ')} (${providers.join(', ')}) are concurrently active in ${group[0].workspace}. Potential Git lock and file overwrite risk.`;
+
+      conflicts.push({
+        workspace: group[0].workspace,
+        session_ids,
+        session_names,
+        providers,
+        detail,
+      });
+    }
+  }
+
+  return conflicts;
+}
+
 export const notificationPolicy: NotificationPolicyContract = {
   evaluate(
     agents: Agent[],
@@ -144,6 +202,25 @@ export const notificationPolicy: NotificationPolicyContract = {
     acknowledgedKeys: ReadonlySet<string>
   ): AlertItem[] {
     const alerts: AlertItem[] = [];
+
+    // Evaluate workspace concurrency conflicts (Phase 2)
+    const conflicts = detectWorkspaceConflicts(agents);
+    for (const conflict of conflicts) {
+      const key = `conflict:${[...conflict.session_ids].sort().join('+')}:${normalizeWorkspacePath(conflict.workspace)}`;
+      if (acknowledgedKeys.has(key)) {
+        continue;
+      }
+      const primaryAgent = agents.find((a) => a.id === conflict.session_ids[0]) ?? agents[0];
+      alerts.push({
+        key,
+        agent: primaryAgent,
+        severity: 'warning',
+        reason: 'workspace-conflict',
+        headline: `Workspace collision: ${conflict.session_names.join(' & ')}`,
+        detail: conflict.detail,
+        conflict,
+      });
+    }
 
     for (const agent of agents) {
       const failedCount = agent.proof?.testsFailed ?? 0;

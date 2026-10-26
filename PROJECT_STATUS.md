@@ -1,4 +1,4 @@
-# Project Status — 2026-10-25 (Updated v0.2.1 — Phase 1 Complete)
+# Project Status — 2026-10-26 (Updated v0.3.0 — Phase 2 Complete)
 
 | Area | Status | Details |
 |---|---|---|
@@ -9,6 +9,10 @@
 | Phase 1: Startup & Single Instance | Completed & verified | `tauri-plugin-single-instance` focuses existing capsule on duplicate launches with accessible alert; `tauri-plugin-autostart` provides a 1-click toggle for Windows Run-key login startup. |
 | Phase 1: Settings Migration & Recovery | Completed & verified | Schema v2 forward migration with automatic backup (`settings.json.bak`), corrupt file quarantine (`settings.corrupt-<ts>.json`), and live integration status health reporting. |
 | Phase 1: Performance Instrumentation | Completed & verified | Local `PerfRegistry` tracking operation timings (`metrics_sample`, `event_log_read`, etc.), Halo self-footprint (PID, RAM, CPU), and frontend round-trip IPC latency summary (avg & p95). |
+| Phase 2: Structured Git Diff & Provenance | Completed & verified | Native porcelain summary parser extracting Git branch, staged/modified/untracked breakdowns, and individual file status tags; records evidence age and execution provenance. |
+| Phase 2: Opt-in Test Runner Parsing | Completed & verified | Parses test execution output across vitest, cargo test, and pytest for accurate passed/failed/total counts and duration; strictly prevents fake verified badges without real passing runs. |
+| Phase 2: Multi-Session Collision Detection | Completed & verified | Concurrency conflict detection identifying active sessions modifying the same workspace/files simultaneously; surfaces `WORKSPACE COLLISION` attention alerts. |
+| Phase 2: Proof-of-Work Evidence UI | Completed & verified | Dedicated Evidence panel in `ActivityView` featuring expandable changed files inspector, test summary metrics, and transparent truth-over-vibes status tags (`FIXTURE` vs `VERIFIED` vs `UNVERIFIED`). |
 | Naming & brand assets | Implemented & verified | Concentric reticle vector geometry (`HaloMark.tsx`, `assets/brand/*.svg`, `src-tauri/icons/icon.ico` & `icon.png`) |
 | Modular React/TS architecture | Implemented & verified | Separated UI (`components/`), runtime controller (`hooks/useHaloRuntime.ts`), settings (`config/settings.ts`), adapters (`lib/agentEvents.ts`), and telemetry (`lib/telemetryHistory.ts`) |
 | Fault recovery (`ErrorBoundary`) | Implemented & verified | Catches render faults inside the floating island with one-click HUD reset |

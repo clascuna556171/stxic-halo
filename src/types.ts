@@ -2,11 +2,53 @@ export type AgentStatus = 'working' | 'waiting' | 'completed' | 'error' | 'unkno
 export type Provider = 'claude-code' | 'codex' | 'other';
 export type Tab = 'overview' | 'activity' | 'system' | 'settings';
 
+export interface GitFileChange {
+  path: string;
+  status: string;
+  staged: boolean;
+}
+
+export interface GitStatusSummary {
+  branch: string | null;
+  clean: boolean;
+  total_changed: number;
+  staged_count: number;
+  modified_count: number;
+  untracked_count: number;
+  files: GitFileChange[];
+}
+
+export interface TestRunSummary {
+  runner: string;
+  passed: number;
+  failed: number;
+  total: number;
+  duration_ms: number | null;
+  summary_line: string | null;
+}
+
 export interface ProofSummary {
-  changedFiles: number | null;
-  testsPassed: number | null;
-  testsFailed: number | null;
+  changed_files?: number | null;
+  changedFiles?: number | null;
+  tests_passed?: number | null;
+  testsPassed?: number | null;
+  tests_failed?: number | null;
+  testsFailed?: number | null;
   verified: boolean;
+  git?: GitStatusSummary | null;
+  test_summary?: TestRunSummary | null;
+  testSummary?: TestRunSummary | null;
+  provenance?: string;
+  evidence_timestamp?: number;
+  evidenceTimestamp?: number;
+}
+
+export interface WorkspaceConflict {
+  workspace: string;
+  session_ids: string[];
+  session_names: string[];
+  providers: string[];
+  detail: string;
 }
 
 export interface Agent {
@@ -169,9 +211,10 @@ export interface AlertItem {
   key: string;
   agent: Agent;
   severity: 'warning' | 'error';
-  reason: 'permission-waiting' | 'tests-failed' | 'agent-error';
+  reason: 'permission-waiting' | 'tests-failed' | 'agent-error' | 'workspace-conflict';
   headline: string;
   detail: string;
+  conflict?: WorkspaceConflict;
 }
 
 export interface ClaudeHookStatus {

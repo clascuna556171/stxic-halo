@@ -770,6 +770,12 @@ code {
   border: 1px solid var(--amber-border);
 }
 
+.verify-badge.fixture {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  border: 1px solid var(--stroke-subtle);
+}
+
 .verification-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -802,6 +808,75 @@ code {
   color: var(--muted);
   font-size: 11px;
   border-radius: 7px;
+}
+
+.changed-files-box {
+  margin-top: 8px;
+  background: #0b0f14;
+  border: 1px solid var(--stroke-subtle);
+  border-radius: 7px;
+  padding: 6px 8px;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+}
+
+.file-row:last-child {
+  border-bottom: 0;
+}
+
+.file-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.file-tag.staged {
+  background: var(--mint-surface);
+  color: var(--mint);
+  border: 1px solid var(--mint-border);
+}
+
+.file-tag.modified {
+  background: var(--amber-surface);
+  color: var(--amber);
+  border: 1px solid var(--amber-border);
+}
+
+.file-tag.untracked {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  border: 1px solid var(--stroke-subtle);
+}
+
+.file-path {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evidence-provenance-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--muted);
 }
 
 .event-log {
