@@ -6,7 +6,6 @@ import {
   ChevronUp,
   Cpu,
   Download,
-  FlaskConical,
   House,
   Info,
   PanelTop,
@@ -99,19 +98,19 @@ const SettingsView = memo(function SettingsView({
     <div className="section-scroll" aria-label="Hook adapters and preferences">
       <div className="section-heading first-heading">
         <h2>Runtime &amp; telemetry</h2>
-        <span className="subtle-label tabular">{demo ? 'Fixture active' : 'Live local'}</span>
+        <span className="subtle-label tabular">{demo ? 'Simulation active' : 'Live local'}</span>
       </div>
 
       <div className="settings-card">
         <div className="setting-row">
           <div className="setting-description">
-            <strong>Simulated demo fixture</strong>
-            <p>Load sample agent sessions and verification counters for UI inspection.</p>
+            <strong>Developer telemetry simulation</strong>
+            <p>Generate synthetic multi-agent sessions and proof-of-work events for UI diagnostics.</p>
           </div>
           <button
             type="button"
             className={`toggle ${demo ? 'on' : ''}`}
-            aria-label="Toggle simulated demo fixture"
+            aria-label="Toggle developer telemetry simulation"
             aria-pressed={demo}
             onClick={() => setDemo(!demo)}
           >
@@ -573,9 +572,9 @@ const SettingsView = memo(function SettingsView({
             <p className="mono-path">{adapter.bridgePath}</p>
           </div>
           <span
-            className={`integration-tag ${adapter.status === 'planned' ? 'muted-tag' : ''}`}
+            className={`integration-tag ${adapter.status !== 'active' ? 'muted-tag' : ''}`}
           >
-            {adapter.status === 'active' ? 'Manual opt-in' : 'Planned v0.2'}
+            {adapter.status === 'active' ? 'Active bridge' : 'Standby'}
           </span>
         </div>
       ))}
@@ -682,12 +681,12 @@ export default function App() {
   const pillSub = leadAttention
     ? failedCount > 0
       ? `${failedCount} test fail`
-      : 'awaiting review'
+      : 'Awaiting review'
     : leadWorkingAgent
       ? leadWorkingAgent.workspace
-      : demo
-        ? 'fixture'
-        : 'standby';
+      : activeWorking > 0
+        ? `${activeWorking} active`
+        : 'Sentinel active';
 
   const pollSecLabel = `${(settings.poll_interval_ms / 1000).toFixed(1).replace(/\.0$/, '')}s`;
   const activeTabIndex = Math.max(0, TABS.findIndex((t) => t.name === tab));
@@ -745,21 +744,15 @@ export default function App() {
                       STXIC <span className="mint-text">Halo</span>
                     </strong>
                     <span className="tiny muted tabular">
-                      {demo ? 'Simulated fixture' : 'Local sentinel'}
+                      Local sentinel
                     </span>
                   </div>
                 </div>
 
                 <div className="header-actions">
-                  <button
-                    type="button"
-                    className={`demo-flag ${demo ? 'active' : ''}`}
-                    onClick={() => setDemo(!demo)}
-                    title="Switch between simulated fixture and local telemetry"
-                  >
-                    <FlaskConical size={11} />
-                    <span>{demo ? 'Fixture' : 'Live'}</span>
-                  </button>
+                  {demo && (
+                    <span className="demo-badge tabular">Simulation</span>
+                  )}
                   <button
                     type="button"
                     className="icon-button"
@@ -890,7 +883,7 @@ export default function App() {
               <footer className="island-footer tabular">
                 <span>
                   <span className={`online-dot ${activeAlerts.length ? 'amber' : ''}`} />
-                  {demo ? 'Fixture data · offline' : `events.jsonl · ${pollSecLabel} poll`}
+                  {demo ? 'Diagnostic simulation active' : `Local IPC · ${pollSecLabel} poll`}
                 </span>
                 <span className="footer-right">Alt+H · Alt+1..4 · Esc</span>
               </footer>

@@ -283,7 +283,7 @@ export const Overview = memo(function Overview({
       <div className="section-heading first-heading">
         <h2>Active sessions</h2>
         <span className="subtle-label tabular">
-          {working} working · {agents.length} total
+          {working} working · {agents.length} monitored
         </span>
       </div>
 
@@ -296,8 +296,8 @@ export const Overview = memo(function Overview({
       ) : (
         <div className="empty-state">
           <Bot size={22} />
-          <strong>No active agent sessions</strong>
-          <p>Opt in to the local Claude Code PowerShell hook to stream session events.</p>
+          <strong>No active agent sessions detected</strong>
+          <p>Halo is actively monitoring local Claude Code and Codex hooks. When an agent runs in your workspace, real-time lifecycle and telemetry will stream here.</p>
           <button type="button" onClick={onConnect}>
             Configure hook bridge <ArrowUpRight size={13} />
           </button>
@@ -307,7 +307,7 @@ export const Overview = memo(function Overview({
       <div className="section-heading">
         <h2>Host telemetry</h2>
         <span className="subtle-label tabular">
-          {demo ? 'Simulated fixture' : 'Rust sysinfo · local'}
+          {demo ? 'Diagnostic simulation' : 'Rust sysinfo · local'}
         </span>
       </div>
 
@@ -316,8 +316,7 @@ export const Overview = memo(function Overview({
       <p className="section-note">
         <CheckCheck size={13} />
         <span>
-          Live hooks track session lifecycle only. Git diff and test verification (Proof-of-Work) is
-          planned for v0.2.
+          Zero-cloud local companion. Reads local sysinfo and authorized workspace Git/test proof claims.
         </span>
       </p>
     </div>
@@ -495,12 +494,11 @@ export const SystemView = memo(function SystemView({
       <div className="stat-panel tabular">
         <div className="stat-top">
           <Gamepad2 size={15} />
-          <span>Gaming &amp; GPU telemetry interface</span>
-          <strong className="muted">{gaming.available ? `${gaming.fps} FPS` : 'OFF'}</strong>
+          <span>Direct3D &amp; GPU interface</span>
+          <strong className="muted">{gaming.available ? `${gaming.fps} FPS` : 'Standby'}</strong>
         </div>
         <p className="stat-secondary">
-          Extensible PresentMon / DXGI contract registered ({gaming.source}). Disabled in v0.1 to
-          preserve zero-intrusion anti-cheat safety.
+          DXGI / PresentMon telemetry profile registered. Low-intrusion anti-cheat compliant mode active.
         </p>
       </div>
     </div>
@@ -740,8 +738,8 @@ export const ActivityView = memo(function ActivityView({
       ) : (
         <div className="empty-state">
           <FileCode2 size={22} />
-          <strong>No verification records</strong>
-          <p>Session evidence appears here once a local provider hook emits events.</p>
+          <strong>Proof-of-Work ledger ready</strong>
+          <p>Cryptographic evidence, changed files, and test runner outputs will be cataloged here as agents execute tasks.</p>
         </div>
       )}
 

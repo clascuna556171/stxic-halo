@@ -59,7 +59,7 @@ const TAB_ORDER: readonly Tab[] = ['overview', 'activity', 'system', 'settings']
 export function useHaloRuntime() {
   const [expanded, setExpanded] = useState(true);
   const [tab, setTab] = useState<Tab>('overview');
-  const [demo, setDemo] = useState(() => !isDesktop());
+  const [demo, setDemo] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(() => loadLocalSettings());
   const [monitors, setMonitors] = useState<MonitorDescriptor[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
