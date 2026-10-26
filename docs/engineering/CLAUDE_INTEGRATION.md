@@ -1,9 +1,13 @@
 # Claude Code Hook Integration — Opt-In Setup
 
-**Prototype status:** first-pass, read-only lifecycle metadata; tested logic still needs verification with the installed Claude Code version on Windows. Never auto-replace a user's existing Claude settings.
+**Current status:** lifecycle metadata plus explicit, single-request Approve/Deny responses. The PowerShell-to-Rust mailbox is integration tested; a live session with the installed Claude Code version still needs manual verification. Never auto-replace a user's existing Claude settings.
 
 ## What it collects
-`session_id`, `hook_event_name`, current working directory and tool name. It does **not** save prompts, output, source code, model credentials, token counts, context window percentages or tool arguments.
+The lifecycle log contains `session_id`, `hook_event_name`, current working directory and tool name. It does **not** contain prompts, output, source code, model credentials, token counts, context window percentages or tool arguments.
+
+Permission requests temporarily store the complete tool input (up to 16 KiB) in `%LOCALAPPDATA%\STXICHalo\permissions` so you can review the actual action. It may include commands or source code. Input is removed after a decision, timeout (45 seconds), or loss of Halo's heartbeat. After a crash, stale mailbox files are removed when Halo next polls. Mailbox contents are excluded from diagnostic exports. This is a same-user local bridge, not an isolation boundary against other programs running as your account.
+
+The notch starts compact. Hover shows a 340 × 112 token preview that hides 350 ms after pointer exit; click opens the full dashboard and keeps it open. Enter/Space and existing keyboard shortcuts open the full dashboard. Context tokens use the latest reported context occupancy, never cumulative billing tokens. Missing provider data is shown as unavailable; inactive sessions show the age of the last report. A pending request changes the notch indicator and text without automatically expanding it. Approve once sends only an `allow` decision for that request; Deny sends `deny`. Neither creates a permanent permission rule. Offline Halo, oversized input, or expiry leaves Claude's normal permission flow in control. Claude's own hook timeout may shorten the available time; use at least 60 seconds for this hook.
 
 ## Prerequisites
 Windows PowerShell 5.1 or later, Claude Code CLI with lifecycle hooks and the STXIC Halo project folder at a fixed absolute path. Review official Anthropic documentation first: https://code.claude.com/docs/en/hooks and https://code.claude.com/docs/en/statusline .
@@ -16,7 +20,7 @@ Windows PowerShell 5.1 or later, Claude Code CLI with lifecycle hooks and the ST
 5. Save valid JSON and restart the Claude session. Use the Claude Code hooks diagnostic commands documented by Anthropic as appropriate for your installed version.
 6. Turn Preview mode OFF in STXIC Halo Settings; new events will be read from local app data.
 
-This example is deliberately a manual opt-in. Automated configuration backup/restore is a future feature.
+Alternatively, use Settings → Claude Code Lifecycle Bridge → Enable for the existing hook manager with backup and rollback. Restart Claude after changing its hook configuration.
 
 ## Test event directly (PowerShell)
 The command below sends a deliberately fake, non-sensitive event; it does not communicate with Claude or edit its settings:

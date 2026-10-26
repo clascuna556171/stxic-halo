@@ -6,6 +6,7 @@ pub const NOTCH_COLLAPSED_WIDTH_LOGICAL: f64 = 340.0;
 pub const NOTCH_COLLAPSED_HEIGHT_LOGICAL: f64 = 38.0;
 pub const ISLAND_COLLAPSED_HEIGHT_LOGICAL: f64 = NOTCH_COLLAPSED_HEIGHT_LOGICAL;
 pub const ISLAND_EXPANDED_HEIGHT_LOGICAL: f64 = 564.0;
+pub const ISLAND_PREVIEW_HEIGHT_LOGICAL: f64 = 112.0;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MonitorDescriptor {
@@ -81,6 +82,30 @@ pub fn calculate_clamped_bounds(
     horizontal_offset_px: i32,
     top_inset_px: i32,
 ) -> (i32, i32, i32, i32) {
+    calculate_clamped_bounds_with_preview(
+        expanded,
+        false,
+        scale_factor,
+        mon_x,
+        mon_y,
+        mon_width,
+        mon_height,
+        horizontal_offset_px,
+        top_inset_px,
+    )
+}
+
+pub fn calculate_clamped_bounds_with_preview(
+    expanded: bool,
+    preview: bool,
+    scale_factor: f64,
+    mon_x: i32,
+    mon_y: i32,
+    mon_width: u32,
+    mon_height: u32,
+    horizontal_offset_px: i32,
+    top_inset_px: i32,
+) -> (i32, i32, i32, i32) {
     let scale = scale_factor.max(0.5);
     let logical_width = if expanded {
         ISLAND_WIDTH_LOGICAL
@@ -89,6 +114,8 @@ pub fn calculate_clamped_bounds(
     };
     let logical_height = if expanded {
         ISLAND_EXPANDED_HEIGHT_LOGICAL
+    } else if preview {
+        ISLAND_PREVIEW_HEIGHT_LOGICAL
     } else {
         NOTCH_COLLAPSED_HEIGHT_LOGICAL
     };
@@ -99,8 +126,7 @@ pub fn calculate_clamped_bounds(
     // Allow top_inset_px = 0 for flush top-bezel Mac Notch docking
     let physical_top_inset = (f64::from(top_inset_px.clamp(0, 64)) * scale).round() as i32;
 
-    let centered_x =
-        mon_x + ((mon_width as i32 - physical_width) / 2) + physical_offset_x;
+    let centered_x = mon_x + ((mon_width as i32 - physical_width) / 2) + physical_offset_x;
     let min_x = mon_x + 8;
     let max_x = (mon_x + mon_width as i32 - physical_width - 8).max(min_x);
     let clamped_x = centered_x.clamp(min_x, max_x);
@@ -122,6 +148,24 @@ pub fn apply_island_bounds<R: Runtime>(
     horizontal_offset_px: i32,
     top_inset_px: i32,
 ) -> Result<(), String> {
+    apply_island_bounds_with_preview(
+        window,
+        expanded,
+        false,
+        target_monitor_index,
+        horizontal_offset_px,
+        top_inset_px,
+    )
+}
+
+pub fn apply_island_bounds_with_preview<R: Runtime>(
+    window: &WebviewWindow<R>,
+    expanded: bool,
+    preview: bool,
+    target_monitor_index: usize,
+    horizontal_offset_px: i32,
+    top_inset_px: i32,
+) -> Result<(), String> {
     let logical_width = if expanded {
         ISLAND_WIDTH_LOGICAL
     } else {
@@ -129,6 +173,8 @@ pub fn apply_island_bounds<R: Runtime>(
     };
     let logical_height = if expanded {
         ISLAND_EXPANDED_HEIGHT_LOGICAL
+    } else if preview {
+        ISLAND_PREVIEW_HEIGHT_LOGICAL
     } else {
         NOTCH_COLLAPSED_HEIGHT_LOGICAL
     };
@@ -150,8 +196,9 @@ pub fn apply_island_bounds<R: Runtime>(
         let size = monitor.size();
         let scale = monitor.scale_factor();
 
-        let (x, y, _, _) = calculate_clamped_bounds(
+        let (x, y, _, _) = calculate_clamped_bounds_with_preview(
             expanded,
+            preview,
             scale,
             pos.x,
             pos.y,
@@ -180,6 +227,15 @@ pub fn show_and_focus_main<R: Runtime>(app: &tauri::AppHandle<R>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn preview_is_small_and_full_dashboard_takes_precedence() {
+        let (_, y, w, h) =
+            calculate_clamped_bounds_with_preview(false, true, 1.25, -2560, 0, 2560, 1440, 0, 0);
+        assert_eq!((y, w, h), (0, 425, 140));
+        let (_, _, w, h) =
+            calculate_clamped_bounds_with_preview(true, true, 1.0, 0, 0, 1920, 1080, 0, 0);
+        assert_eq!((w, h), (460, 564));
+    }
 
     #[test]
     fn test_single_monitor_1080p_100_percent_dpi() {

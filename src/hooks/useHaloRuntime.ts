@@ -25,6 +25,7 @@ import {
   readMetrics,
   readPerformanceStats,
   readProcessLifecycle,
+  readUsageReports,
   revokeWorkspace,
   saveSettings,
   setLaunchAtLogin,
@@ -35,6 +36,7 @@ import { reduceCodexSessions } from '../lib/codexAdapter';
 import { localProofOfWorkVerifier } from '../lib/proofOfWork';
 import { appendMetricsSample, EMPTY_METRICS_HISTORY } from '../lib/telemetryHistory';
 import { reconcileSessions } from '../lib/sessionReconciliation';
+import { applyWorkspaceChecks, workspaceIdentity } from '../lib/activity';
 import { appendPollTiming, summarizePollTimings } from '../lib/perfTiming';
 import type {
   Agent,
@@ -49,15 +51,18 @@ import type {
   MonitorDescriptor,
   PerformanceStats,
   PollTimingSummary,
+  ProofSummary,
   ProcessLifecycleSnapshot,
   Tab,
   UserSettings,
+  UsageReadResult,
 } from '../types';
 
 const TAB_ORDER: readonly Tab[] = ['overview', 'activity', 'system', 'settings'];
 
 export function useHaloRuntime() {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
+  const [preview, setPreview] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
   const [demo, setDemo] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(() => loadLocalSettings());
@@ -65,6 +70,11 @@ export function useHaloRuntime() {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [metricsHistory, setMetricsHistory] = useState<MetricsHistorySummary>(EMPTY_METRICS_HISTORY);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [usageResult, setUsageResult] = useState<UsageReadResult>({ reports: [], errors: [] });
+  const [workspaceChecks, setWorkspaceChecks] = useState<Record<string, ProofSummary>>({});
+  const workspaceChecksRef = useRef(workspaceChecks);
+  workspaceChecksRef.current = workspaceChecks;
+  const verificationInFlight = useRef(false);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [liveError, setLiveError] = useState<string | null>(null);
   const [acknowledgedAlertKeys, setAcknowledgedAlertKeys] = useState<Set<string>>(() => new Set());
@@ -141,6 +151,8 @@ export function useHaloRuntime() {
 
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
+  const previewRef = useRef(preview);
+  previewRef.current = preview;
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -161,11 +173,12 @@ export function useHaloRuntime() {
 
   // Keep native desktop window tightly fitted to capsule state & monitor DPI.
   useEffect(() => {
-    void fitIsland(expanded, settings).catch(() => {
+    void fitIsland(expanded, settings, false, preview).catch(() => {
       /* Browser preview or unavailable window API */
     });
   }, [
     expanded,
+    preview,
     settings.target_monitor_index,
     settings.horizontal_offset_px,
     settings.top_inset_px,
@@ -175,7 +188,7 @@ export function useHaloRuntime() {
   useEffect(() => {
     if (!isDesktop()) return;
     const onResize = () => {
-      void fitIsland(expandedRef.current, settingsRef.current, true).catch(() => {});
+      void fitIsland(expandedRef.current, settingsRef.current, true, previewRef.current).catch(() => {});
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -188,6 +201,7 @@ export function useHaloRuntime() {
       onToggleExpand: () => setExpanded((prev) => !prev),
       onPositionReset: () => {
         setExpanded(false);
+        setPreview(false);
         setSettings((prev) =>
           sanitizeSettings({
             ...prev,
@@ -199,7 +213,6 @@ export function useHaloRuntime() {
       },
       onSecondInstance: () => {
         setSecondInstancePing(Date.now());
-        setExpanded(true);
       },
     }).then((unlisten) => {
       cleanup = unlisten;
@@ -218,15 +231,15 @@ export function useHaloRuntime() {
         const codexEvents = prev.filter((e) => e.source === 'codex');
         return [...newEvents, ...codexEvents];
       });
-      const claudeAgents = sessionsFromEvents(newEvents, {
+      const claudeAgents = sessionsFromEvents(newEvents.filter(e => e.source !== 'codex'), {
         staleMinutes: settingsRef.current.stale_minutes,
       });
       setAgents((prev) => {
         const codexAgents = prev.filter((a) => a.provider === 'codex');
         const raw = [...claudeAgents, ...codexAgents];
-        return reconcileSessions(raw, processLifecycleRef.current, {
+        return applyWorkspaceChecks(reconcileSessions(raw, processLifecycleRef.current, {
           enabled: settingsRef.current.process_reconciliation !== false,
-        });
+        }), workspaceChecksRef.current);
       });
     }).then((unlisten) => {
       cleanup = unlisten;
@@ -253,9 +266,10 @@ export function useHaloRuntime() {
       }
 
       // Escape key to collapse expanded console
-      if (event.key === 'Escape' && expanded) {
+      if (event.key === 'Escape' && (expanded || preview)) {
         event.preventDefault();
         setExpanded(false);
+        setPreview(false);
         return;
       }
 
@@ -271,7 +285,7 @@ export function useHaloRuntime() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [expanded]);
+  }, [expanded, preview]);
 
   // Optional auto-collapse when floating window loses focus.
   useEffect(() => {
@@ -297,12 +311,13 @@ export function useHaloRuntime() {
     if (demo || !isDesktop()) return;
     try {
       const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      const [nextMetrics, nextEvents, codexEvents, codexTelemetry, processSnapshot] = await Promise.all([
+      const [nextMetrics, nextEvents, codexEvents, codexTelemetry, processSnapshot, usage] = await Promise.all([
         readMetrics(),
         readEvents(),
         settingsRef.current.enable_codex_logs !== false ? readCodexEvents() : Promise.resolve([]),
         settingsRef.current.enable_codex_logs !== false ? readCodexTelemetry() : Promise.resolve([]),
         readProcessLifecycle(),
+        readUsageReports(),
       ]);
       const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       setPollTimings((prev) => appendPollTiming(prev, elapsed));
@@ -311,8 +326,9 @@ export function useHaloRuntime() {
       setMetrics(nextMetrics);
       setMetricsHistory((prev) => appendMetricsSample(prev, nextMetrics));
       setEvents(combinedEvents);
+      setUsageResult(usage);
 
-      const claudeAgents = sessionsFromEvents(nextEvents, {
+      const claudeAgents = sessionsFromEvents(nextEvents.filter(e => e.source !== 'codex'), {
         staleMinutes: settingsRef.current.stale_minutes,
       });
       const codexAgents = reduceCodexSessions(codexEvents, {
@@ -323,7 +339,7 @@ export function useHaloRuntime() {
       const reconciled = reconcileSessions(raw, processSnapshot, {
         enabled: settingsRef.current.process_reconciliation !== false,
       });
-      setAgents(reconciled);
+      setAgents(applyWorkspaceChecks(reconciled, workspaceChecksRef.current));
       setProcessLifecycle(processSnapshot);
       setLiveError(null);
     } catch (error) {
@@ -345,12 +361,13 @@ export function useHaloRuntime() {
       inFlight = true;
       try {
         const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        const [nextMetrics, nextEvents, codexEvents, codexTelemetry, processSnapshot] = await Promise.all([
+        const [nextMetrics, nextEvents, codexEvents, codexTelemetry, processSnapshot, usage] = await Promise.all([
           readMetrics(),
           readEvents(),
           settingsRef.current.enable_codex_logs !== false ? readCodexEvents() : Promise.resolve([]),
           settingsRef.current.enable_codex_logs !== false ? readCodexTelemetry() : Promise.resolve([]),
           readProcessLifecycle(),
+          readUsageReports(),
         ]);
         const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
         setPollTimings((prev) => appendPollTiming(prev, elapsed));
@@ -360,8 +377,9 @@ export function useHaloRuntime() {
         setMetrics(nextMetrics);
         setMetricsHistory((prev) => appendMetricsSample(prev, nextMetrics));
         setEvents(combinedEvents);
+        setUsageResult(usage);
 
-        const claudeAgents = sessionsFromEvents(nextEvents, {
+        const claudeAgents = sessionsFromEvents(nextEvents.filter(e => e.source !== 'codex'), {
           staleMinutes: settingsRef.current.stale_minutes,
         });
         const codexAgents = reduceCodexSessions(codexEvents, {
@@ -372,7 +390,7 @@ export function useHaloRuntime() {
         const reconciled = reconcileSessions(raw, processSnapshot, {
           enabled: settingsRef.current.process_reconciliation !== false,
         });
-        setAgents(reconciled);
+        setAgents(applyWorkspaceChecks(reconciled, workspaceChecksRef.current));
         setProcessLifecycle(processSnapshot);
         setLiveError(null);
 
@@ -435,6 +453,7 @@ export function useHaloRuntime() {
     await clearEvents();
     setEvents([]);
     setAgents([]);
+    setWorkspaceChecks({});
   }, []);
 
   const shownAgents = demo ? demoAgents : agents;
@@ -466,22 +485,27 @@ export function useHaloRuntime() {
 
   const handleVerifyWorkspace = useCallback(
     async (workspacePath: string, runTests = false, testProfile?: string) => {
+      if (verificationInFlight.current) throw new Error('A workspace check is already running. Wait for it to finish.');
+      verificationInFlight.current = true;
       try {
         const result = await localProofOfWorkVerifier.verifyWorkspace(workspacePath, {
           runTests,
           testProfile,
         });
         if (result) {
-          setAgents((prev) =>
-            prev.map((a) =>
-              a.workspace === workspacePath ? { ...a, proof: result } : a
-            )
-          );
+          const key = workspaceIdentity(workspacePath);
+          const entries = Object.entries(workspaceChecksRef.current).filter(([existing]) => existing !== key);
+          const next = Object.fromEntries([...entries.slice(-31), [key, result]]);
+          workspaceChecksRef.current = next;
+          setWorkspaceChecks(next);
+          setAgents(prev => applyWorkspaceChecks(prev, next));
         }
         return result;
       } catch (err) {
         setLiveError(err instanceof Error ? err.message : String(err));
-        return null;
+        throw err;
+      } finally {
+        verificationInFlight.current = false;
       }
     },
     []
@@ -560,6 +584,8 @@ export function useHaloRuntime() {
   return {
     expanded,
     setExpanded,
+    preview,
+    setPreview,
     tab,
     setTab,
     openTab,
@@ -569,6 +595,8 @@ export function useHaloRuntime() {
     updateSettings,
     monitors,
     shownAgents,
+    usageResult: demo ? { reports: [], errors: [] } : usageResult,
+    workspaceChecks,
     shownMetrics,
     shownHistory,
     shownEvents,

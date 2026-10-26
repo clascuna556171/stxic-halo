@@ -43,11 +43,21 @@ npm run desktop:dev
 # Build standard Windows NSIS/MSI installers
 npm run desktop:build
 
+# Build a standalone executable with the UI embedded (no dev server needed)
+npm run desktop:build:exe
+
 # Build Microsoft Store candidate with offline WebView2 installer configuration
 npm run desktop:build:store
 ```
 
+Use the Tauri build commands for release binaries. A plain `cargo build --release` is rejected because it leaves Tauri in development mode without embedded UI assets.
+
 ## Claude Code Hook Opt-In
+
+Antigravity, GitHub Copilot CLI, and OpenCode can be connected from **Settings → More coding agents**.
+**Overview → Usage & limits** separates reported session tokens/cost from subscription quota and context.
+All five providers appear together in Overview. Codex reads logged quota snapshots; Copilot CLI reads recorded token/premium-request totals; OpenCode reports tokens/cost after its plugin is connected. Other missing metrics have an explanation and require a separate local usage source.
+See [provider setup, availability, and usage exports](docs/engineering/PROVIDER_INTEGRATIONS.md).
 
 1. Read `docs/engineering/CLAUDE_INTEGRATION.md`.
 2. Back up `%USERPROFILE%\.claude\settings.json` if present.

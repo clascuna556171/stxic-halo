@@ -15,7 +15,9 @@ npm install
 npm run desktop:dev
 ```
 
-Expected: a small top-center capsule. Click to expand. Use Preview mode for fake agent sessions; turn it off to see real CPU/RAM and empty live sessions.
+Expected: a small top-center capsule. Hover for a small context-token preview; move away to hide it. Click or press Enter/Space to open the full dashboard, which stays open until you close it. Use Preview mode for fake agent sessions; turn it off to see real CPU/RAM and empty live sessions.
+
+For a standalone executable, run `npm run desktop:build:exe`, then open `src-tauri\target\release\stxic-halo.exe`. The release embeds its UI and runs without a development server.
 
 ## 3. Enable Claude lifecycle events (optional)
 

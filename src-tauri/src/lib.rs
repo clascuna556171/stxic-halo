@@ -1,9 +1,13 @@
 pub mod claude_manager;
 pub mod codex;
+pub mod copilot_usage;
 pub mod config;
 pub mod diagnostics;
 pub mod events;
 pub mod paths;
+pub mod providers;
+pub mod usage;
+pub mod permissions;
 pub mod perf;
 pub mod profiling;
 pub mod proof_of_work;
@@ -121,14 +125,16 @@ fn sync_island_bounds(
     window: WebviewWindow,
     state: State<'_, Mutex<UserSettings>>,
     expanded: bool,
+    preview: Option<bool>,
 ) -> Result<(), String> {
     let settings = state
         .lock()
         .map(|s| s.clone())
         .unwrap_or_else(|_| UserSettings::default());
-    apply_island_bounds(
+    window::apply_island_bounds_with_preview(
         &window,
         expanded,
+        preview.unwrap_or(false),
         settings.target_monitor_index,
         settings.horizontal_offset_px,
         settings.top_inset_px,
@@ -423,7 +429,7 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = apply_island_bounds(
                     &window,
-                    true,
+                    false,
                     initial_settings.target_monitor_index,
                     initial_settings.horizontal_offset_px,
                     initial_settings.top_inset_px,
@@ -434,6 +440,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             read_metrics,
+            permissions::list_permission_requests,
+            permissions::respond_to_permission,
             read_agent_events,
             clear_agent_events,
             read_process_lifecycle,
@@ -455,6 +463,9 @@ pub fn run() {
             claude_manager::check_claude_hook_status,
             claude_manager::enable_claude_hook,
             claude_manager::disable_claude_hook,
+            providers::provider_connections,
+            providers::set_provider_connection,
+            usage::read_usage_reports,
         ])
         .run(tauri::generate_context!())
         .expect("Could not launch STXIC Halo");

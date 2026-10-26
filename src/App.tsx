@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -15,11 +15,16 @@ import {
   Zap,
 } from 'lucide-react';
 import HaloMark from './components/HaloMark';
-import { ActivityView, Overview, SystemView } from './components/Dashboard';
+import { Overview, SystemView } from './components/Dashboard';
+import { ProviderConnections } from './components/ProviderConnections';
+import { ActivityView } from './components/ActivityView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useHaloRuntime } from './hooks/useHaloRuntime';
+import { usePermissions } from './hooks/usePermissions';
+import { createHoverDisclosure } from './lib/hoverDisclosure';
+import { contextBudget, currentSessions, providerName } from './lib/sessionSummary';
+import { relativeTime } from './lib/format';
 import { isDesktop } from './lib/desktop';
-import { gib, percent } from './lib/format';
 import type {
   ClaudeHookStatus,
   DiagnosticBundleExport,
@@ -64,6 +69,7 @@ const SettingsView = memo(function SettingsView({
   exportingBundle = false,
   exportResult,
   exportError,
+  suggestedWorkspace,
 }: {
   demo: boolean;
   setDemo: (value: boolean) => void;
@@ -86,8 +92,18 @@ const SettingsView = memo(function SettingsView({
   exportingBundle?: boolean;
   exportResult?: DiagnosticBundleExport | null;
   exportError?: string | null;
+  suggestedWorkspace?: string;
 }) {
-  const [workspaceInput, setWorkspaceInput] = useState('');
+  const [workspaceInput, setWorkspaceInput] = useState(suggestedWorkspace ?? '');
+  const [workspaceError, setWorkspaceError] = useState('');
+  const [workspaceAuthorizing, setWorkspaceAuthorizing] = useState(false);
+  const workspaceInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!suggestedWorkspace) return;
+    setWorkspaceInput(suggestedWorkspace);
+    workspaceInputRef.current?.focus();
+    workspaceInputRef.current?.scrollIntoView({ block: 'center' });
+  }, [suggestedWorkspace]);
   return (
     <div className="section-scroll" aria-label="Settings and preferences">
       {/* 1. AGENT INTEGRATIONS */}
@@ -121,7 +137,8 @@ const SettingsView = memo(function SettingsView({
               </span>
             </div>
             <p style={{ marginTop: '4px' }}>
-              Streams tool actions, prompts, and test results into Halo via <code>~/.claude/settings.json</code>.
+              Connects lifecycle events and permission decisions via <code>~/.claude/settings.json</code>.
+              Requested tool input is held locally only while awaiting your decision (up to 45 seconds).
             </p>
             {claudeHookStatus?.backup_exists && (
               <p className="mono-path" style={{ marginTop: '3px', fontSize: '10px', color: 'var(--mint)' }}>
@@ -218,6 +235,9 @@ const SettingsView = memo(function SettingsView({
         </div>
       </div>
 
+      <div className="section-heading"><h2>More coding agents</h2><span className="subtle-label">Opt-in connections</span></div>
+      <div className="settings-card"><ProviderConnections /></div>
+
       {/* 2. AUTHORIZED WORKSPACES */}
       <div className="section-heading">
         <h2>Authorized project folders</h2>
@@ -227,7 +247,9 @@ const SettingsView = memo(function SettingsView({
       <div className="settings-card">
         <div style={{ display: 'flex', gap: '8px', padding: '12px 14px' }}>
           <input
+            ref={workspaceInputRef}
             type="text"
+            aria-label="Workspace folder path"
             className="workspace-input"
             placeholder="C:\path\to\project"
             value={workspaceInput}
@@ -245,17 +267,25 @@ const SettingsView = memo(function SettingsView({
           <button
             type="button"
             className="inline-action"
-            onClick={() => {
+            disabled={workspaceAuthorizing || !workspaceInput.trim()}
+            onClick={async () => {
               if (workspaceInput.trim() && onApproveWorkspace) {
-                void onApproveWorkspace(workspaceInput.trim());
-                setWorkspaceInput('');
+                setWorkspaceAuthorizing(true);
+                setWorkspaceError('');
+                try {
+                  await onApproveWorkspace(workspaceInput.trim());
+                  setWorkspaceInput('');
+                } catch (error) {
+                  setWorkspaceError(error instanceof Error ? error.message : String(error));
+                } finally { setWorkspaceAuthorizing(false); }
               }
             }}
           >
-            Authorize
+            {workspaceAuthorizing ? 'Authorizing…' : 'Authorize'}
           </button>
         </div>
 
+        {workspaceError && <p className="activity-check-error" role="alert">{workspaceError}</p>}
         {settings.approved_workspaces && settings.approved_workspaces.length > 0 ? (
           settings.approved_workspaces.map((ws) => (
             <div key={ws} className="setting-row" style={{ padding: '8px 14px' }}>
@@ -492,6 +522,8 @@ export default function App() {
   const {
     expanded,
     setExpanded,
+    preview,
+    setPreview,
     tab,
     setTab,
     openTab,
@@ -501,6 +533,8 @@ export default function App() {
     updateSettings,
     monitors,
     shownAgents,
+    usageResult,
+    workspaceChecks,
     shownMetrics,
     shownHistory,
     shownEvents,
@@ -528,8 +562,22 @@ export default function App() {
     exportError,
   } = useHaloRuntime();
 
+  const [workspaceSetup, setWorkspaceSetup] = useState('');
+  useEffect(() => { if (tab !== 'settings') setWorkspaceSetup(''); }, [tab]);
+
   const collapsedPillRef = useRef<HTMLButtonElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
+  const permissions = usePermissions(!demo);
+  const pendingPermission = permissions.requests[0];
+  const hover = useMemo(() => createHoverDisclosure(
+    () => { if (!expanded) setPreview(true); },
+    () => setPreview(false),
+    () => true,
+  ), [expanded, setPreview]);
+  useEffect(() => () => hover.cancel(), [hover]);
+  useEffect(() => {
+    if (expanded) setPreview(false);
+  }, [expanded, setPreview]);
 
   // Accessible focus retention: return focus to collapsed pill when closing,
   // and focus the active tab when expanding.
@@ -543,56 +591,59 @@ export default function App() {
     wasExpandedRef.current = expanded;
   }, [expanded]);
 
-  const activeWorking = shownAgents.filter((a) => a.status === 'working').length;
-  const leadWorkingAgent = shownAgents.find((a) => a.status === 'working') ?? shownAgents[0];
+  const sessions = currentSessions(shownAgents);
+  const activeWorking = sessions.filter((a) => a.status === 'working').length;
+  const leadWorkingAgent = sessions[0];
+  const previewAgent = leadWorkingAgent ?? [...shownAgents].sort((a, b) => Date.parse(b.lastSeen) - Date.parse(a.lastSeen))[0];
+  const budget = contextBudget(previewAgent);
   const leadAlert = activeAlerts[0];
   const leadAttention = leadAlert?.agent;
   const failedCount = leadAttention?.proof?.testsFailed ?? 0;
 
-  const ledStatusClass = activeAlerts.length > 0
+  const ledStatusClass = pendingPermission || activeAlerts.length > 0
     ? 'waiting'
     : activeWorking > 0
       ? 'working'
       : 'idle';
 
-  const pillHeadline = leadAttention
-    ? leadAttention.name
-    : leadWorkingAgent
-      ? leadWorkingAgent.name
-      : 'STXIC Halo';
+  const pillHeadline = leadWorkingAgent ? providerName(leadWorkingAgent) : 'STXIC Halo';
 
-  const pillSub = leadAttention
+  const pillSub = pendingPermission ? 'Approval required' : leadAttention
     ? failedCount > 0
       ? `${failedCount} test fail`
       : 'Awaiting review'
     : leadWorkingAgent
-      ? leadWorkingAgent.workspace
+      ? `${sessions.length} active`
       : activeWorking > 0
         ? `${activeWorking} active`
         : 'Ready';
 
-  const pollSecLabel = `${(settings.poll_interval_ms / 1000).toFixed(1).replace(/\.0$/, '')}s`;
   const activeTabIndex = Math.max(0, TABS.findIndex((t) => t.name === tab));
   const isFloatingBezel = settings.top_inset_px > 0;
 
   return (
     <ErrorBoundary onReset={() => setExpanded(false)}>
       <div
-        className={`app-frame ${expanded ? 'expanded' : 'collapsed'} ${settings.reduce_motion ? 'reduce-motion' : ''}`}
+        className={`app-frame ${expanded ? 'expanded' : preview ? 'preview' : 'collapsed'} ${settings.reduce_motion ? 'reduce-motion' : ''}`}
       >
         <div className="sr-only" aria-live="polite" aria-atomic="true">
           {secondInstancePing ? 'STXIC Halo instance already running; focused floating console.' : ''}
         </div>
-        <div className="island" role="region" aria-label="STXIC Halo floating monitor">
+        <div className="island" role="region" aria-label="STXIC Halo floating monitor"
+          onPointerEnter={(event) => { if (event.pointerType !== 'touch') hover.enter(); }}
+          onPointerLeave={() => hover.leave()}
+        >
           {!expanded ? (
             <button
               ref={collapsedPillRef}
               type="button"
-              className={`collapsed-pill ${activeAlerts.length ? 'has-warning' : ''} ${isFloatingBezel ? 'floating-bezel' : ''}`}
-              onClick={() => setExpanded(true)}
-              aria-label="Expand STXIC Halo telemetry console (Alt+H or Enter)"
-              title="Expand console (Alt+H or Enter)"
+              className={`collapsed-pill ${preview ? 'token-preview' : ''} ${pendingPermission || activeAlerts.length ? 'has-warning' : ''} ${isFloatingBezel ? 'floating-bezel' : ''}`}
+              onClick={() => { hover.cancel(); setPreview(false); setExpanded(true); }}
+              aria-expanded={false}
+              aria-label="Open Halo dashboard"
+              title="Hover for tokens · Click to open dashboard"
             >
+              <span className="notch-summary">
               <span className="notch-left">
                 <span className={`notch-led ${ledStatusClass}`} aria-hidden="true" />
                 <span className="pill-main">
@@ -606,14 +657,16 @@ export default function App() {
                 <span
                   className={`pill-telemetry tabular ${activeAlerts.length ? 'warning' : 'healthy'}`}
                 >
-                  {failedCount > 0
-                    ? `${failedCount} fail`
-                    : shownMetrics
-                      ? `${percent(shownMetrics.cpu_percent)} · ${gib(shownMetrics.memory_used_bytes)}`
-                      : 'Local'}
+                  {pendingPermission ? 'Review' : budget ? `${budget.percentRemaining}% left` : 'Local'}
                 </span>
                 <ChevronDown size={13} className="pill-chevron" />
               </span>
+              </span>
+              {preview && <span className="token-preview-body">
+                <span className="token-preview-value tabular">{budget ? `${budget.remaining.toLocaleString()} tokens left` : 'Token count unavailable'}</span>
+                <span className="token-preview-detail">{previewAgent ? `${previewAgent.workspace} · ` : ''}{budget ? `${leadWorkingAgent ? 'Context' : 'Last report'} · ${relativeTime(previewAgent!.lastSeen)}` : 'Waiting for provider data'}</span>
+                <span className="token-preview-hint">Click to open dashboard</span>
+              </span>}
             </button>
           ) : (
             <div className={`expanded-card ${isFloatingBezel ? 'floating-bezel' : ''}`}>
@@ -704,19 +757,33 @@ export default function App() {
                 id={`halo-panel-${tab}`}
                 aria-labelledby={`halo-tab-${tab}`}
               >
+                {pendingPermission && (
+                  <section className="permission-card" aria-label="Claude Code permission request">
+                    <strong>Approval required · {pendingPermission.tool_name}</strong>
+                    <p className="permission-workspace">{pendingPermission.cwd}</p>
+                    <p className="permission-workspace">Session {pendingPermission.session_id}</p>
+                    <pre tabIndex={0} aria-label="Requested tool input">{pendingPermission.tool_input}</pre>
+                    <div className="permission-actions">
+                      <span className="tabular">{permissions.requests.length} pending</span>
+                      <button type="button" className="inline-action subtle-action" disabled={permissions.busy}
+                        onClick={() => void permissions.decide(pendingPermission.id, 'deny')}>Deny</button>
+                      <button type="button" className="inline-action" disabled={permissions.busy || Date.now() >= pendingPermission.expires_at}
+                        onClick={() => void permissions.decide(pendingPermission.id, 'allow')}>Approve once</button>
+                    </div>
+                    <p>Expires after 45 seconds; then review in Claude Code.</p>
+                  </section>
+                )}
+                {permissions.error && <p className="permission-message" role="alert">{permissions.error}</p>}
+                {permissions.notice && <p className="permission-message" role="status">{permissions.notice}</p>}
                 {tab === 'overview' && (
                   <Overview
+                    usageResult={usageResult}
                     agents={shownAgents}
-                    alerts={activeAlerts}
-                    metrics={shownMetrics}
-                    demo={demo}
-                    pollIntervalMs={settings.poll_interval_ms}
+                    alerts={activeAlerts.filter(alert => alert.agent.id !== pendingPermission?.session_id)}
                     onReview={() => openTab('activity')}
                     onAcknowledgeAlert={acknowledgeAlert}
                     onConnect={() => openTab('settings')}
                     claudeHookStatus={claudeHookStatus}
-                    onEnableClaudeHook={handleEnableClaudeHook}
-                    hookLoading={hookLoading}
                   />
                 )}
                 {tab === 'activity' && (
@@ -725,6 +792,9 @@ export default function App() {
                     events={shownEvents}
                     demo={demo}
                     onVerifyWorkspace={handleVerifyWorkspace}
+                    approvedWorkspaces={settings.approved_workspaces ?? []}
+                    checks={workspaceChecks}
+                    onWorkspaceSettings={(path) => { setWorkspaceSetup(path); openTab('settings'); }}
                   />
                 )}
                 {tab === 'system' && (
@@ -740,6 +810,7 @@ export default function App() {
                 )}
                 {tab === 'settings' && (
                   <SettingsView
+                    suggestedWorkspace={workspaceSetup}
                     demo={demo}
                     setDemo={setDemo}
                     settings={settings}
@@ -768,9 +839,9 @@ export default function App() {
               <footer className="island-footer tabular">
                 <span>
                   <span className={`online-dot ${activeAlerts.length ? 'amber' : ''}`} />
-                  {demo ? 'Diagnostic simulation' : `Local sentinel · ${pollSecLabel} poll`}
+                  {demo ? 'Simulation' : `On this device · ${sessions.length} active`}
                 </span>
-                <span className="footer-right">Alt+H · Alt+1..4 · Esc</span>
+                <span className="footer-right">Esc to close</span>
               </footer>
             </div>
           )}
@@ -779,7 +850,7 @@ export default function App() {
         {!isDesktop() && !expanded && (
           <div className="browser-help">
             <PanelTop size={15} />
-            <span>Click the top-edge HUD capsule to inspect sessions and hook telemetry.</span>
+            <span>Hover for tokens. Click for the full dashboard.</span>
           </div>
         )}
         {!isDesktop() && expanded && (

@@ -3,14 +3,15 @@ param(
   [switch]$Release
 )
 
-$target = if ($Release) {
-  Join-Path $PSScriptRoot "..\src-tauri\target\release\stxic-halo.exe"
-} else {
-  Join-Path $PSScriptRoot "..\src-tauri\target\release\stxic-halo.exe"
-}
+$releaseFolder = Join-Path $PSScriptRoot '..\src-tauri\target\release'
+# An existing executable may be locked by another app while a replacement is built.
+$target = @('stxic-halo.exe', 'stxic-halo-activity.exe', 'stxic-halo-providers.exe', 'stxic-halo-overview.exe') |
+  ForEach-Object { Get-Item -LiteralPath (Join-Path $releaseFolder $_) -ErrorAction SilentlyContinue } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 1 -ExpandProperty FullName
 
-if (-not (Test-Path -LiteralPath $target)) {
-  throw "Binary not found at $target. Run cargo build --release first."
+if (-not $target) {
+  throw "No release binary found. Run npm run desktop:build:exe first."
 }
 
 $fullTarget = (Resolve-Path -LiteralPath $target).Path
@@ -73,7 +74,7 @@ if (-not $ok) {
   $shell = New-Object -ComObject Shell.Application
   $shell.ShellExecute($fullTarget)
   Start-Sleep -Seconds 2
-  $proc = Get-Process -Name "stxic-halo" -ErrorAction SilentlyContinue | Sort-Object StartTime -Descending | Select-Object -First 1
+  $proc = Get-Process -Name ([IO.Path]::GetFileNameWithoutExtension($fullTarget)) -ErrorAction SilentlyContinue | Sort-Object StartTime -Descending | Select-Object -First 1
   if ($proc) {
     Write-Output "STXIC Halo running on WinSta0\Default (via Shell.Application) with PID: $($proc.Id)"
   } else {

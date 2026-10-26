@@ -8,6 +8,15 @@ import {
 } from '../src/lib/desktop';
 
 describe('Window bounds & multi-monitor DPI scaling', () => {
+  it('fits a small token preview at high DPI without allocating the full dashboard window', () => {
+    const bounds = calculatePhysicalBounds(false, { x: -2560, y: 0, width: 2560, height: 1440, scaleFactor: 1.25 },
+      { horizontal_offset_px: 0, top_inset_px: 0 }, true);
+    expect(bounds.width).toBe(340);
+    expect(bounds.height).toBe(112);
+    expect(bounds.physicalHeight).toBe(140);
+    expect(bounds.y).toBe(0);
+    expect(bounds.x).toBeLessThan(0);
+  });
   it('correctly calculates collapsed notch (340x38) and expanded island (460x564) physical dimensions on standard 1080p (1.0x scale)', () => {
     const monitor1080p = { x: 0, y: 0, width: 1920, height: 1080, scaleFactor: 1.0 };
     const settings = { horizontal_offset_px: 0, top_inset_px: 0 };

@@ -53,6 +53,7 @@ describe('Codex CLI Adapter: Rollout Log Parser', () => {
               input_tokens: 45000,
               output_tokens: 5000,
             },
+            last_token_usage: { total_tokens: 25000 },
             model_context_window: 250000,
           },
         },
@@ -73,7 +74,7 @@ describe('Codex CLI Adapter: Rollout Log Parser', () => {
     expect(result?.workspace).toBe('D:\\Tech\\Projects\\staxichalo');
     expect(result?.status).toBe('completed');
     expect(result?.tokenUsage).toBe(50000);
-    expect(result?.contextPercent).toBe(20); // 50000 / 250000 = 20%
+    expect(result?.contextPercent).toBe(10); // Current context, not cumulative session tokens
     expect(result?.lastSeen).toBe('2026-10-25T11:05:00.000Z');
 
     // Verify events generated for the timeline

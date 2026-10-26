@@ -12,6 +12,9 @@ import type {
 
 const EVENT_STATUS: Record<string, AgentStatus> = {
   SessionStart: 'working',
+  UserPromptSubmit: 'working',
+  PreInvocation: 'working',
+  PostInvocation: 'working',
   PreToolUse: 'working',
   PostToolUse: 'working',
   PermissionRequest: 'waiting',
@@ -23,6 +26,9 @@ const EVENT_STATUS: Record<string, AgentStatus> = {
 const SUPPORTED_SOURCES: Record<string, { provider: Provider; name: string }> = {
   'claude-code': { provider: 'claude-code', name: 'Claude Code' },
   codex: { provider: 'codex', name: 'Codex' },
+  antigravity: { provider: 'antigravity', name: 'Antigravity' },
+  'github-copilot': { provider: 'github-copilot', name: 'GitHub Copilot' },
+  opencode: { provider: 'opencode', name: 'OpenCode' },
 };
 
 export function statusForEvent(event: string): AgentStatus {
@@ -46,6 +52,9 @@ export function isSessionStale(
 }
 
 function describeTask(event: AgentEvent, status: AgentStatus, previousTask?: string): string {
+  if (event.event === 'UserPromptSubmit') return 'Working on a new request';
+  if (event.event === 'PreInvocation') return 'Model is working';
+  if (event.event === 'PostInvocation') return 'Model invocation finished';
   if (event.event === 'PermissionRequest') {
     return event.tool_name
       ? `Approval required · ${event.tool_name.slice(0, 48)}`
@@ -77,14 +86,15 @@ export function sessionsFromEvents(
     const sourceMeta = SUPPORTED_SOURCES[event.source];
     if (!sourceMeta) continue;
 
-    const existing = sessions.get(event.session_id);
+    const key = `${event.source}:${event.session_id}`;
+    const existing = sessions.get(key);
     const nextStatus = statusForEvent(event.event);
     const resolvedStatus =
       nextStatus === 'unknown' ? (existing?.status ?? 'unknown') : nextStatus;
     const workspace = event.cwd ? displayPath(event.cwd) : existing?.workspace ?? 'Workspace';
 
-    sessions.set(event.session_id, {
-      id: event.session_id,
+    sessions.set(key, {
+      id: event.source === 'claude-code' || event.source === 'codex' ? event.session_id : key,
       provider: sourceMeta.provider,
       name: sourceMeta.name,
       task: describeTask(event, resolvedStatus, existing?.task),
@@ -131,6 +141,14 @@ export const codexPlannedAdapter: AgentProviderAdapter = codexAdapter;
 export const PROVIDER_ADAPTERS: readonly AgentProviderAdapter[] = [
   claudeCodeAdapter,
   codexAdapter,
+  ...(['antigravity', 'github-copilot', 'opencode'] as const).map(id => ({
+    id,
+    displayName: SUPPORTED_SOURCES[id].name,
+    bridgePath: id === 'opencode' ? 'scripts/opencode-halo.js' : 'scripts/provider-hook.ps1',
+    status: 'active' as const,
+    capabilities: { lifecycle: true, tokenUsage: id === 'opencode', contextWindow: false, approvals: false, proofOfWork: false },
+    reduceEvents: (events: AgentEvent[], options?: { nowMs?: number; staleMinutes?: number }) => sessionsFromEvents(events.filter(e => e.source === id), options),
+  })),
 ];
 
 export function buildAlertKey(agent: Agent): string {

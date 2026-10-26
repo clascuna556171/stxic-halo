@@ -9,6 +9,11 @@ export const RECONCILE_GRACE_MS = 5_000;
 const PROVIDER_PROCESS_ID: Record<Provider, string | null> = {
   'claude-code': 'claude-code',
   codex: 'codex',
+  // These integrations report lifecycle through hooks/plugins. The process collector
+  // cannot reliably match their IDE hosts, so absence is never evidence of exit.
+  antigravity: null,
+  'github-copilot': null,
+  opencode: null,
   other: null,
 };
 

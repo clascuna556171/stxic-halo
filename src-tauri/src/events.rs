@@ -35,7 +35,7 @@ pub struct AgentEvent {
 
 impl AgentEvent {
     pub fn is_valid(&self) -> bool {
-        let valid_source = matches!(self.source.as_str(), "claude-code" | "codex");
+        let valid_source = matches!(self.source.as_str(), "claude-code" | "codex" | "antigravity" | "github-copilot" | "opencode");
         let valid_cwd = self.cwd.as_ref().map_or(true, |c| c.len() <= 512);
         let valid_tool = self.tool_name.as_ref().map_or(true, |t| t.len() <= 48);
 

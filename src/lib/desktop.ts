@@ -1,4 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import type { BridgeProvider, ProviderConnection, UsageReadResult } from '../types';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import {
   availableMonitors,
@@ -28,8 +29,28 @@ export const NOTCH_COLLAPSED_WIDTH = 340;
 export const ISLAND_WIDTH = 460;
 export const ISLAND_COLLAPSED_HEIGHT = 38;
 export const ISLAND_EXPANDED_HEIGHT = 564;
+export const ISLAND_PREVIEW_HEIGHT = 112;
 
 export const isDesktop = (): boolean => isTauri();
+
+export interface PermissionRequest {
+  id: string;
+  session_id: string;
+  cwd: string;
+  tool_name: string;
+  tool_input: string;
+  expires_at: number;
+}
+
+export async function listPermissionRequests(): Promise<PermissionRequest[]> {
+  if (!isDesktop()) return [];
+  return invoke<PermissionRequest[]>('list_permission_requests');
+}
+
+export async function respondToPermission(id: string, behavior: 'allow' | 'deny'): Promise<void> {
+  if (!isDesktop()) throw new Error('Permission decisions require the desktop bridge.');
+  await invoke('respond_to_permission', { id, behavior });
+}
 
 export async function readMetrics(): Promise<Metrics> {
   return invoke<Metrics>('read_metrics');
@@ -108,6 +129,22 @@ export async function readCodexTelemetry(limit = 8): Promise<CodexSessionTelemet
   }
 }
 
+export async function readUsageReports(): Promise<UsageReadResult> {
+  if (!isTauri()) return { reports: [], errors: [] };
+  try { return await invoke<UsageReadResult>('read_usage_reports'); }
+  catch { return { reports: [], errors: ['Usage exports could not be read.'] }; }
+}
+
+export async function readProviderConnections(): Promise<ProviderConnection[]> {
+  if (!isTauri()) return [];
+  return invoke<ProviderConnection[]>('provider_connections');
+}
+
+export async function setProviderConnection(provider: BridgeProvider, enabled: boolean): Promise<ProviderConnection> {
+  if (!isTauri()) throw new Error('Open Halo desktop to manage provider connections.');
+  return invoke<ProviderConnection>('set_provider_connection', { provider, enabled });
+}
+
 export async function readCodexEvents(limit = 8): Promise<AgentEvent[]> {
   if (!isTauri()) return [];
   try {
@@ -174,10 +211,11 @@ let lastBoundsSignature = '';
 export function calculatePhysicalBounds(
   expanded: boolean,
   monitor: { x: number; y: number; width: number; height: number; scaleFactor: number },
-  settings: Pick<UserSettings, 'horizontal_offset_px' | 'top_inset_px'>
+  settings: Pick<UserSettings, 'horizontal_offset_px' | 'top_inset_px'>,
+  preview = false
 ): { x: number; y: number; width: number; height: number; physicalWidth: number; physicalHeight: number } {
   const logicalWidth = expanded ? ISLAND_WIDTH : NOTCH_COLLAPSED_WIDTH;
-  const logicalHeight = expanded ? ISLAND_EXPANDED_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
+  const logicalHeight = expanded ? ISLAND_EXPANDED_HEIGHT : preview ? ISLAND_PREVIEW_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
   const scale = Math.max(0.5, monitor.scaleFactor);
   const physicalWidth = Math.round(logicalWidth * scale);
   const physicalHeight = Math.round(logicalHeight * scale);
@@ -205,19 +243,20 @@ export function calculatePhysicalBounds(
 export async function fitIsland(
   expanded: boolean,
   settings: UserSettings = DEFAULT_SETTINGS,
-  force = false
+  force = false,
+  preview = false
 ): Promise<void> {
   if (!isTauri()) return;
 
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  const sig = `${expanded ? 1 : 0}:${settings.target_monitor_index}:${settings.horizontal_offset_px}:${settings.top_inset_px}:${dpr.toFixed(2)}`;
+  const sig = `${expanded ? 'full' : preview ? 'preview' : 'compact'}:${settings.target_monitor_index}:${settings.horizontal_offset_px}:${settings.top_inset_px}:${dpr.toFixed(2)}`;
   if (!force && sig === lastBoundsSignature) {
     return;
   }
   lastBoundsSignature = sig;
 
   try {
-    await invoke('sync_island_bounds', { expanded });
+    await invoke('sync_island_bounds', { expanded, preview });
     return;
   } catch {
     // Fallback to frontend window positioning if native command is unavailable.
@@ -225,7 +264,7 @@ export async function fitIsland(
 
   const win = getCurrentWindow();
   const width = expanded ? ISLAND_WIDTH : NOTCH_COLLAPSED_WIDTH;
-  const height = expanded ? ISLAND_EXPANDED_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
+  const height = expanded ? ISLAND_EXPANDED_HEIGHT : preview ? ISLAND_PREVIEW_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
   await win.setSize(new LogicalSize(width, height));
 
   const monitors = await availableMonitors().catch(() => []);
@@ -246,7 +285,8 @@ export async function fitIsland(
         height: targetMonitor.size.height,
         scaleFactor: targetMonitor.scaleFactor,
       },
-      settings
+      settings,
+      preview
     );
 
     await win.setPosition(new PhysicalPosition(x, y));

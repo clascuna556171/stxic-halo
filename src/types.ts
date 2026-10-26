@@ -1,5 +1,41 @@
 export type AgentStatus = 'working' | 'waiting' | 'completed' | 'error' | 'unknown';
-export type Provider = 'claude-code' | 'codex' | 'other';
+export type Provider = 'claude-code' | 'codex' | 'antigravity' | 'github-copilot' | 'opencode' | 'other';
+export type BridgeProvider = 'antigravity' | 'github-copilot' | 'opencode';
+
+export interface ProviderConnection {
+  provider: BridgeProvider;
+  installed: boolean;
+  config_path: string;
+}
+
+export interface QuotaWindow {
+  label: string;
+  used_percent: number;
+  window_minutes?: number | null;
+  resets_at?: number | null; // Unix seconds, never inferred from the plan name.
+  observed_at: string;
+}
+
+export interface SessionUsage {
+  session_id: string;
+  total_tokens: number | null;
+  cost_usd: number | null;
+  premium_requests?: number | null;
+  observed_at: string;
+}
+
+export interface ProviderUsageReport {
+  schema_version: number;
+  provider: Exclude<Provider, 'other'>;
+  sessions: SessionUsage[];
+  quotas: QuotaWindow[];
+  source?: 'session-log' | 'local-export' | 'plugin' | 'statusline';
+}
+
+export interface UsageReadResult {
+  reports: ProviderUsageReport[];
+  errors: string[];
+}
 export type Tab = 'overview' | 'activity' | 'system' | 'settings';
 
 export interface GitFileChange {
@@ -60,6 +96,10 @@ export interface Agent {
   status: AgentStatus;
   contextPercent: number | null;
   tokenUsage: number | null;
+  contextTokens?: number | null;
+  contextWindow?: number | null;
+  usageObservedAt?: string;
+  quotaWindows?: QuotaWindow[];
   lastSeen: string;
   proof: ProofSummary | null;
   isDemo: boolean;
@@ -296,8 +336,11 @@ export interface CodexSessionTelemetry {
   workspace: string;
   status: string;
   total_tokens?: number;
+  context_tokens?: number;
   context_window?: number;
   context_percent?: number;
+  usage_observed_at?: string;
+  quota_windows?: QuotaWindow[];
   last_seen: string;
   last_event: string;
 }

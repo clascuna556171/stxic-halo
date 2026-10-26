@@ -103,16 +103,17 @@ export function parseCodexRolloutLines(lines: string[]): ParsedCodexSession | nu
         if (info) {
           const totalUsage = info.total_token_usage as Record<string, unknown> | undefined;
           const lastUsage = info.last_token_usage as Record<string, unknown> | undefined;
-          const tokens = Number(totalUsage?.total_tokens ?? lastUsage?.total_tokens);
-          if (Number.isFinite(tokens) && tokens > 0) {
+          const tokens = totalUsage?.total_tokens;
+          if (typeof tokens === 'number' && Number.isSafeInteger(tokens) && tokens >= 0) {
             tokenUsage = tokens;
           }
           if (typeof info.model_context_window === 'number' && info.model_context_window > 0) {
             contextWindow = info.model_context_window;
           }
-          if (tokenUsage !== null && contextWindow !== null && contextWindow > 0) {
-            contextPercent = Math.min(100, Math.round((tokenUsage / contextWindow) * 100));
-          }
+          const contextTokens = lastUsage?.total_tokens;
+          contextPercent = typeof contextTokens === 'number' && Number.isFinite(contextTokens) && contextTokens >= 0
+            && contextWindow !== null && contextWindow > 0
+            ? Math.min(100, Math.round((contextTokens / contextWindow) * 100)) : null;
         }
       } else if (eventType === 'task_complete') {
         status = 'completed';
@@ -211,6 +212,10 @@ export function reduceCodexSessions(
             ? Math.round(tel.context_percent)
             : existing?.contextPercent ?? null,
         tokenUsage: typeof tel.total_tokens === 'number' ? tel.total_tokens : existing?.tokenUsage ?? null,
+        contextTokens: tel.context_tokens ?? null,
+        contextWindow: tel.context_window ?? null,
+        usageObservedAt: tel.usage_observed_at,
+        quotaWindows: tel.quota_windows ?? [],
         lastSeen: tel.last_seen || existing?.lastSeen || new Date().toISOString(),
         proof: existing?.proof ?? null,
         isDemo: false,
