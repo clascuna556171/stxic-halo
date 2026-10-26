@@ -1,4 +1,4 @@
-# Project Status — 2026-10-26 (Updated v0.3.0 — Phase 2 Complete)
+# Project Status — 2026-10-26 (Updated v0.3.1 — Phase 3A Complete)
 
 | Area | Status | Details |
 |---|---|---|
@@ -13,11 +13,15 @@
 | Phase 2: Opt-in Test Runner Parsing | Completed & verified | Parses test execution output across vitest, cargo test, and pytest for accurate passed/failed/total counts and duration; strictly prevents fake verified badges without real passing runs. |
 | Phase 2: Multi-Session Collision Detection | Completed & verified | Concurrency conflict detection identifying active sessions modifying the same workspace/files simultaneously; surfaces `WORKSPACE COLLISION` attention alerts. |
 | Phase 2: Proof-of-Work Evidence UI | Completed & verified | Dedicated Evidence panel in `ActivityView` featuring expandable changed files inspector, test summary metrics, and transparent truth-over-vibes status tags (`FIXTURE` vs `VERIFIED` vs `UNVERIFIED`). |
+| Phase 3A: Idle Profiler & Memory Leak Protection | Completed & verified | Bounded `IdleProfiler` ring buffer in Rust (`profiling.rs`) tracking heap/RSS drift rate (>512 KB/min warning threshold), `PerformanceStats` leak analysis exposure, and frontend ring caps (poll timings capped at 60, telemetry history capped at 24). |
+| Phase 3A: Windows Log-Rotation Hardening | Completed & verified | `src-tauri/src/events.rs::rotate_log_file` removes pre-existing `.bak` before rename with copy+truncate fallback on Windows; verified with `test_log_rotation_when_backup_file_already_exists`. |
+| Phase 3A: Workspace Traversal Guard | Completed & verified | `src-tauri/src/proof_of_work.rs` canonicalizes approved paths, strictly rejecting `..`, root escapes, or unapproved folders. |
+| Phase 3A: Privacy & Security Documentation | Completed & verified | Documented 2 MiB automatic rotation, zero-cloud local telemetry, and traversal guards in `SECURITY_PRIVACY.md` and `PRIVACY_POLICY_DRAFT.md`. |
 | Naming & brand assets | Implemented & verified | Concentric reticle vector geometry (`HaloMark.tsx`, `assets/brand/*.svg`, `src-tauri/icons/icon.ico` & `icon.png`) |
 | Modular React/TS architecture | Implemented & verified | Separated UI (`components/`), runtime controller (`hooks/useHaloRuntime.ts`), settings (`config/settings.ts`), adapters (`lib/agentEvents.ts`), and telemetry (`lib/telemetryHistory.ts`) |
 | Fault recovery (`ErrorBoundary`) | Implemented & verified | Catches render faults inside the floating island with one-click HUD reset |
 | Persistent user settings | Implemented & verified | Atomic JSON persistence in `%LOCALAPPDATA%\STXICHalo\settings.json` + `localStorage` mirror (poll cadence, monitor index, auto-collapse on blur, reduced motion, alert filters, approved workspaces, Codex logs toggle, process reconciliation) |
-| Tauri 2 Windows shell & tray | Implemented & verified | Modular `src-tauri/src/{paths,telemetry,events,config,window,proof_of_work,codex,claude_manager,perf,lib}.rs` with DPI-aware multi-monitor clamping, tight `460×78` collapsed bounds, and system tray recovery menu |
+| Tauri 2 Windows shell & tray | Implemented & verified | Modular `src-tauri/src/{paths,telemetry,events,config,window,proof_of_work,codex,claude_manager,perf,profiling,lib}.rs` with DPI-aware multi-monitor clamping, tight `460×78` collapsed bounds, and system tray recovery menu |
 | Low-overhead CPU/RAM/processes | Implemented & verified | Targeted `sysinfo` refresh (`CpuRefreshKind` + `MemoryRefreshKind`) with process count throttled to 10s intervals (`ProcessRefreshKind::nothing()`) |
 | Claude Code hook bridge | Hardened & verified | `scripts/claude-hook.ps1` with 2 MiB automatic rotation and 3-attempt shared-lock retry; Rust `EventLogReader` caches `(len, modified_ms)` to avoid redundant disk reads |
 | Proof-of-Work Verifier (v0.2) | Implemented & verified | Concrete `ProofOfWorkVerifierContract` in Rust (`proof_of_work.rs`) & TS (`proofOfWork.ts`) inspecting `git status --porcelain` and allowlisted test runners (`npm test`, `cargo test`, `pnpm test`, `yarn test`, `vitest run`, `pytest`) for user-approved workspaces |
@@ -29,11 +33,13 @@
 ## Verification Summary (Current Workstation)
 - **Rust Toolchain:**
   - `rustup` (`stable-x86_64-pc-windows-msvc`, `rustc 1.99.1`, `cargo 1.99.1`) verified.
-  - `cargo test`: 23 Rust unit tests passing (23/23) across `events`, `proof_of_work`, `telemetry`, `claude_manager`, `config`, `perf`, `window`, and `codex`.
+  - `cargo test`: 32 Rust unit tests passing (32/32) across `events`, `proof_of_work`, `telemetry`, `claude_manager`, `config`, `perf`, `window`, `codex`, and `profiling`.
   - `cargo check`: Rust native crate compiles with 0 errors.
 - **Frontend & TypeScript:**
-  - `npm test` (`vitest run`): 8 test suites, 42 unit tests passing (`sessionReconciliation.test.ts`, `perfTiming.test.ts`, `claudeHook.test.ts`, `codexAdapter.test.ts`, `agentEvents.test.ts`, `windowBounds.test.ts`, `foundation.test.ts`, `proofOfWork.test.ts`).
+  - `npm test` (`vitest run`): 9 test suites, 47 unit tests passing (`sessionReconciliation.test.ts`, `perfTiming.test.ts`, `claudeHook.test.ts`, `codexAdapter.test.ts`, `agentEvents.test.ts`, `windowBounds.test.ts`, `foundation.test.ts`, `proofOfWork.test.ts`, `leakProfiling.test.ts`).
   - `npm run build` (`tsc --noEmit && vite build`): strict TypeScript typecheck and Vite production build (`dist/`) succeeded with 0 errors.
 - **Hook Bridges & Watcher:**
   - `scripts/manage-claude-hook.ps1` verified with `Status`, `Enable`, `Disable`, and `Rollback` commands.
   - Background `EventLogWatcher` thread verifies file truncation and 2 MiB rotation without locking disk files.
+- **Independent QA:**
+  - Verified by GitHub Copilot with `QA VERDICT: PASS` in `QA-visible-20261026-115055-869-d74b859b.txt`.

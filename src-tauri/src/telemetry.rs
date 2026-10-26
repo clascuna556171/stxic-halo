@@ -88,7 +88,7 @@ pub fn classify_runtime_cmd<S: AsRef<OsStr>>(cmd: &[S]) -> Option<&'static str> 
     }
 }
 
-fn epoch_ms() -> u64 {
+pub fn epoch_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_millis() as u64)

@@ -570,4 +570,13 @@ mod tests {
             &approved
         ));
     }
+
+    #[test]
+    fn test_workspace_approval_path_traversal_prevention() {
+        let approved = vec![".".to_string()];
+        assert!(!is_workspace_approved("../..", &approved));
+        assert!(!is_workspace_approved("..", &approved));
+        assert!(!is_workspace_approved("C:\\Windows", &approved));
+        assert!(!is_workspace_approved("/etc/passwd", &approved));
+    }
 }

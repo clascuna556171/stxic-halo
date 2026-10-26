@@ -4,6 +4,7 @@ pub mod config;
 pub mod events;
 pub mod paths;
 pub mod perf;
+pub mod profiling;
 pub mod proof_of_work;
 pub mod telemetry;
 pub mod window;
@@ -11,6 +12,7 @@ pub mod window;
 use config::{SettingsHealth, UserSettings};
 use events::{AgentEvent, EventLogReader, EventLogStatus, EventLogWatcher};
 use perf::{PerfRegistry, TimingStat};
+use profiling::{IdleProfiler, LeakAnalysis, MemorySample};
 use serde::Serialize;
 use std::{
     collections::BTreeMap,
@@ -225,22 +227,51 @@ pub struct PerformanceStats {
     pub uptime_secs: u64,
     pub footprint: SelfFootprint,
     pub timings: BTreeMap<String, TimingStat>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leak_analysis: Option<LeakAnalysis>,
 }
 
 #[tauri::command]
 fn read_performance_stats(
     collector: State<'_, Mutex<TelemetryCollector>>,
     perf: State<'_, Arc<PerfRegistry>>,
+    profiler: State<'_, Mutex<IdleProfiler>>,
 ) -> Result<PerformanceStats, String> {
     let footprint = collector
         .lock()
         .map(|mut c| c.self_footprint())
         .map_err(|_| "System telemetry collector lock poisoned".to_string())?;
+
+    let leak_analysis = if footprint.available {
+        if let Ok(mut p) = profiler.lock() {
+            p.record(MemorySample {
+                timestamp_ms: telemetry::epoch_ms(),
+                memory_bytes: footprint.memory_bytes,
+                virtual_memory_bytes: footprint.virtual_memory_bytes,
+                cpu_percent: footprint.cpu_percent,
+            });
+            Some(p.analyze())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     Ok(PerformanceStats {
         uptime_secs: perf.uptime_secs(),
         footprint,
         timings: perf.snapshot(),
+        leak_analysis,
     })
+}
+
+#[tauri::command]
+fn read_idle_profile(profiler: State<'_, Mutex<IdleProfiler>>) -> Result<LeakAnalysis, String> {
+    let guard = profiler
+        .lock()
+        .map_err(|_| "Idle profiler lock poisoned".to_string())?;
+    Ok(guard.analyze())
 }
 
 fn setup_system_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -333,6 +364,7 @@ pub fn run() {
         .manage(Mutex::new(initial_settings.clone()))
         .manage(Mutex::new(settings_health))
         .manage(perf)
+        .manage(Mutex::new(IdleProfiler::default()))
         .setup(move |app| {
             // Best-effort system tray registration so borderless skipTaskbar window is always recoverable.
             let _ = setup_system_tray(app);
@@ -369,6 +401,7 @@ pub fn run() {
             set_launch_at_login,
             read_integration_status,
             read_performance_stats,
+            read_idle_profile,
             proof_of_work::verify_proof_of_work,
             proof_of_work::approve_workspace,
             proof_of_work::revoke_workspace,

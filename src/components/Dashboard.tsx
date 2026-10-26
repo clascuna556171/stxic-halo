@@ -16,6 +16,7 @@ import {
   Gauge,
   GitBranch,
   HardDrive,
+  ShieldCheck,
   TerminalSquare,
 } from 'lucide-react';
 import type {
@@ -431,6 +432,18 @@ export const SystemView = memo(function SystemView({
             </span>
           ) : (
             <span>Collecting IPC round-trip latency samples...</span>
+          )}
+          {perfStats?.leak_analysis && (
+            <span
+              style={{
+                display: 'block',
+                marginTop: '4px',
+                color: perfStats.leak_analysis.suspected_leak ? '#cf222e' : 'var(--status-working, #3fb950)',
+              }}
+            >
+              <ShieldCheck size={12} style={{ display: 'inline', verticalAlign: '-1px', marginRight: '4px' }} />
+              {perfStats.leak_analysis.status}
+            </span>
           )}
         </p>
 

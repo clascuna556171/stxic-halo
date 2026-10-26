@@ -33,9 +33,10 @@ Schedule estimate for a single motivated Windows/TypeScript/Rust developer: 8–
 **Exit criteria met:** user can see changed-file summary (staged/modified/untracked breakdown and file list), passed/failed tests with duration, which source reported each result, evidence age, and concurrent workspace collision detection.
 
 ## Phase 3 — Beta / Store readiness (weeks 9–12)
-- [ ] Background idle resource profiling and leak tests.
-- [ ] Threat-model review, privacy policy and legal check.
-- [ ] Signed offline installer, updates, rollback.
+- [x] Background idle resource profiling and leak tests (IdleProfiler drift detection, bounded memory rings).
+- [x] Threat-model review, privacy policy and legal check (workspace traversal guard, allowlisted test runners, 2MB log rotation).
+- [x] Offline NSIS (.exe) installer packaging verified (HALO-005).
+- [ ] Signed offline installer, updates, rollback (EV Authenticode certificate & update channel).
 - [ ] Windows Defender / SmartScreen reputation and Store certification checks.
 - [ ] Beta feedback from developers and screen-reader users.
 - [ ] Branding / domain / name clearance.

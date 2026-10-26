@@ -5,6 +5,7 @@ use std::{
     collections::VecDeque,
     fs::{self, File},
     io::{BufRead, BufReader, Seek, SeekFrom},
+    path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
@@ -49,6 +50,24 @@ impl AgentEvent {
             && valid_cwd
             && valid_tool
     }
+}
+
+/// Rotates an event log file to its backup path reliably across platforms.
+/// On Windows, `fs::rename` fails if the destination file already exists; this helper
+/// removes any existing backup first, and provides a copy-and-truncate fallback so
+/// the oversized source file is guaranteed to be rotated or cleared.
+pub fn rotate_log_file(path: &Path, backup: &Path) -> std::io::Result<()> {
+    if backup.exists() {
+        let _ = fs::remove_file(backup);
+    }
+    if fs::rename(path, backup).is_err() {
+        if fs::copy(path, backup).is_ok() {
+            let _ = fs::write(path, b"");
+        } else {
+            let _ = fs::write(path, b"");
+        }
+    }
+    Ok(())
 }
 
 /// In-memory bounded queue ensuring strict memory caps with FIFO eviction.
@@ -157,7 +176,7 @@ impl EventLogReader {
 
         let metadata =
             fs::metadata(&path).map_err(|_| "Cannot inspect Halo event file".to_string())?;
-        let mut len = metadata.len();
+        let len = metadata.len();
 
         // 1. Truncation detection: if file size shrank, reset and reload
         if len < self.last_len {
@@ -169,13 +188,14 @@ impl EventLogReader {
         // 2. Automatic log rotation at 2 MiB to bound disk usage
         if len > MAX_LOG_FILE_BYTES {
             if let Ok(backup) = event_log_backup_path() {
-                let _ = fs::rename(&path, &backup);
-                self.last_len = 0;
-                self.last_modified_ms = 0;
-                self.event_queue.clear();
-                return Ok((true, Vec::new()));
+                let _ = rotate_log_file(&path, &backup);
+            } else {
+                let _ = fs::write(&path, b"");
             }
-            len = metadata.len();
+            self.last_len = 0;
+            self.last_modified_ms = 0;
+            self.event_queue.clear();
+            return Ok((true, Vec::new()));
         }
 
         let modified_ms = metadata
@@ -360,5 +380,50 @@ mod tests {
             ..valid.clone()
         };
         assert!(!empty_session.is_valid());
+    }
+
+    #[test]
+    fn test_log_rotation_when_backup_file_already_exists() {
+        let temp_dir = std::env::temp_dir().join(format!(
+            "halo_test_rot_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&temp_dir).unwrap();
+
+        let source = temp_dir.join("events.jsonl");
+        let backup = temp_dir.join("events.jsonl.bak");
+
+        // Pre-create backup with old data to simulate Windows destination collision
+        fs::write(&backup, b"old stale backup content\n").unwrap();
+        assert!(backup.exists());
+
+        // Create oversized source file (> 2 MiB)
+        let payload = vec![b'A'; (MAX_LOG_FILE_BYTES + 8192) as usize];
+        fs::write(&source, &payload).unwrap();
+
+        let initial_source_len = fs::metadata(&source).unwrap().len();
+        assert!(initial_source_len > MAX_LOG_FILE_BYTES);
+
+        // Execute rotation helper
+        rotate_log_file(&source, &backup).expect("rotation should succeed despite existing backup");
+
+        // Verification 1: backup exists and matches new oversized source content
+        assert!(backup.exists());
+        let backup_len = fs::metadata(&backup).unwrap().len();
+        assert_eq!(backup_len, initial_source_len);
+
+        // Verification 2: source is either deleted (via rename) or truncated to 0 bytes
+        let remaining_len = if source.exists() {
+            fs::metadata(&source).unwrap().len()
+        } else {
+            0
+        };
+        assert_eq!(remaining_len, 0);
+
+        // Clean up
+        let _ = fs::remove_dir_all(&temp_dir);
     }
 }

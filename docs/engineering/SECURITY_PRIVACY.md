@@ -11,14 +11,15 @@ Prompts, source file contents, code diffs, tool arguments, credential stores, br
 ## Threats and controls
 1. **Sensitive paths and project names:** treat cwd as private; don't send on network; redact in support bundles.
 2. **Malicious JSONL input:** parse a strict schema; bound bytes/record counts, escape all UI text by React rendering; don't interpret strings as HTML.
-3. **Path traversal:** read only fixed local event location; future workspace monitoring restricted to explicit user-approved canonical paths.
-4. **Arbitrary command execution:** no execute-from-agent-text feature. Future test runners require allowlisted commands and confirmation.
+3. **Path traversal:** read only fixed local event location; workspace monitoring restricted to explicit user-approved canonical paths via `normalize_canonical_path` and `is_workspace_approved`; relative traversal escapes (`..`) are strictly rejected.
+4. **Arbitrary command execution:** no execute-from-agent-text feature. Test execution is strictly restricted to allowlisted profiles (`cargo test`, `npm test`, `vitest run`, `pytest`) without shell interpolation.
 5. **Hook hijacking:** never overwrite user's config; require opt-in, show script contents and support rollback. Hooks must not alter permission outcomes.
 6. **Localhost API risks:** none in MVP. If future API added, bind loopback, authenticate messages, validate origin/CSRF and rate limits; do not trust localhost blindly.
 7. **Dependency/supply chain:** pin after compatibility test, generate SBOM, audit libraries and signing secrets, review license obligations.
 8. **Accessibility/focus denial:** tray escape route, shortcuts and overlay bounds tests to avoid obstructing Windows inputs.
-9. **Log retention:** current demo bridge can append without rotation; production must bound size/age and provide deletion.
-10. **Privacy claims:** do not promise end-to-end secrecy if user later opts into remote connectors. Privacy copy must match actual behavior.
+9. **Log retention:** bounded event logs with 2 MiB automatic rotation (`MAX_LOG_FILE_BYTES`), in-memory bounded queue (`MAX_BOUNDED_EVENTS` = 250), and user-triggered event clearing (`clear_agent_events`).
+10. **Resource leak prevention:** runtime idle profiler (`IdleProfiler`) tracks memory drift rate and flags warnings if sustained growth exceeds 512 KB/min over continuous background sessions.
+11. **Privacy claims:** do not promise end-to-end secrecy if user later opts into remote connectors. Privacy copy must match actual behavior.
 
 ## Explicit permissions roadmap
 - `system.read.basic` (local CPU/RAM, default)

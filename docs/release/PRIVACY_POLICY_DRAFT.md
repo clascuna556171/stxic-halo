@@ -11,7 +11,7 @@ Halo's current Windows prototype reads CPU utilization, system memory statistics
 The prototype does not request an account, analytics identity, source-code contents, prompts, model responses, clipboard or credential-store values. It does not upload system or hook data to a STXIC server. Preview-mode data is simulated and is not drawn from your computer.
 
 ## 3. Storage and retention
-When enabled, Claude lifecycle metadata is stored in `%LOCALAPPDATA%\STXICHalo\events.jsonl`. The current prototype does not automatically delete or rotate that file. You may remove the hook configuration and delete the file manually. Automatic retention and export controls must be implemented before public release.
+When enabled, Claude lifecycle metadata is stored in `%LOCALAPPDATA%\STXICHalo\events.jsonl`. The runtime automatically rotates the file when it exceeds 2 MiB, maintaining at most one backup file (`events.jsonl.bak`) to prevent disk bloat. In-memory event queues are capped at 250 items with FIFO eviction. You may clear events at any time from the Hooks view or remove the hook configuration.
 
 ## 4. Permissions and your controls
 You choose whether to install the Claude Code hook. Halo does not modify Claude settings automatically. You can disconnect by removing Halo-specific hook entries and restarting Claude. You can enable Demo mode in Halo at any time.

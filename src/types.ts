@@ -176,6 +176,16 @@ export interface TimingStat {
   max_ms: number;
 }
 
+export interface LeakAnalysis {
+  sample_count: number;
+  baseline_memory_bytes: number;
+  current_memory_bytes: number;
+  drift_bytes: number;
+  drift_rate_kb_per_min: number;
+  suspected_leak: boolean;
+  status: string;
+}
+
 export interface PerformanceStats {
   uptime_secs: number;
   footprint: {
@@ -186,6 +196,7 @@ export interface PerformanceStats {
     virtual_memory_bytes: number;
   };
   timings: Record<string, TimingStat>;
+  leak_analysis?: LeakAnalysis;
 }
 
 /** Frontend-measured poll round-trip summary (IPC + Rust work + React state). */
