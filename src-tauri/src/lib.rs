@@ -347,13 +347,13 @@ fn setup_system_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>>
                     if let Ok(mut guard) = state.lock() {
                         guard.target_monitor_index = 0;
                         guard.horizontal_offset_px = 0;
-                        guard.top_inset_px = 10;
+                        guard.top_inset_px = 0;
                         let _ = guard.save_to_disk();
                     }
                 }
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.show();
-                    let _ = apply_island_bounds(&window, false, 0, 0, 10);
+                    let _ = apply_island_bounds(&window, false, 0, 0, 0);
                 }
                 let _ = app.emit("halo://position-reset", ());
             }
@@ -423,11 +423,12 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = apply_island_bounds(
                     &window,
-                    false,
+                    true,
                     initial_settings.target_monitor_index,
                     initial_settings.horizontal_offset_px,
                     initial_settings.top_inset_px,
                 );
+                show_and_focus_main(app.handle());
             }
             Ok(())
         })

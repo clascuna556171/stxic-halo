@@ -20,14 +20,14 @@ describe('settings persistence & sanitization', () => {
       poll_interval_ms: 100, // below 1000ms min
       target_monitor_index: -3,
       horizontal_offset_px: 9999,
-      top_inset_px: 1,
+      top_inset_px: -10,
       stale_minutes: 500,
       reduce_motion: true,
     });
     expect(sanitized.poll_interval_ms).toBe(1000);
     expect(sanitized.target_monitor_index).toBe(0);
     expect(sanitized.horizontal_offset_px).toBe(1600);
-    expect(sanitized.top_inset_px).toBe(4);
+    expect(sanitized.top_inset_px).toBe(0);
     expect(sanitized.stale_minutes).toBe(120);
     expect(sanitized.reduce_motion).toBe(true);
   });

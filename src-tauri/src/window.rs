@@ -2,8 +2,10 @@ use serde::Serialize;
 use tauri::{LogicalSize, Manager, PhysicalPosition, Runtime, WebviewWindow};
 
 pub const ISLAND_WIDTH_LOGICAL: f64 = 460.0;
-pub const ISLAND_COLLAPSED_HEIGHT_LOGICAL: f64 = 78.0;
-pub const ISLAND_EXPANDED_HEIGHT_LOGICAL: f64 = 604.0;
+pub const NOTCH_COLLAPSED_WIDTH_LOGICAL: f64 = 340.0;
+pub const NOTCH_COLLAPSED_HEIGHT_LOGICAL: f64 = 38.0;
+pub const ISLAND_COLLAPSED_HEIGHT_LOGICAL: f64 = NOTCH_COLLAPSED_HEIGHT_LOGICAL;
+pub const ISLAND_EXPANDED_HEIGHT_LOGICAL: f64 = 564.0;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MonitorDescriptor {
@@ -66,9 +68,9 @@ pub fn enumerate_monitors<R: Runtime>(
     Ok(list)
 }
 
-/// Calculates the physical window size and clamped screen coordinates for the floating island.
-/// Ensures the window is strictly clamped within the specified monitor's bounds with 8px edge margins,
-/// and scales proportionally with the monitor's DPI scale factor.
+/// Calculates the physical window size and clamped screen coordinates for the top-anchored notch / Dynamic Island.
+/// Supports zero-inset top-bezel docking (`top_inset_px: 0`, `Y = 0` relative to monitor top),
+/// compact notch dimensions (`340x38`), and expanded executive HUD dimensions (`460x564`).
 pub fn calculate_clamped_bounds(
     expanded: bool,
     scale_factor: f64,
@@ -80,17 +82,22 @@ pub fn calculate_clamped_bounds(
     top_inset_px: i32,
 ) -> (i32, i32, i32, i32) {
     let scale = scale_factor.max(0.5);
-    let logical_width = ISLAND_WIDTH_LOGICAL;
+    let logical_width = if expanded {
+        ISLAND_WIDTH_LOGICAL
+    } else {
+        NOTCH_COLLAPSED_WIDTH_LOGICAL
+    };
     let logical_height = if expanded {
         ISLAND_EXPANDED_HEIGHT_LOGICAL
     } else {
-        ISLAND_COLLAPSED_HEIGHT_LOGICAL
+        NOTCH_COLLAPSED_HEIGHT_LOGICAL
     };
 
     let physical_width = (logical_width * scale).round() as i32;
     let physical_height = (logical_height * scale).round() as i32;
     let physical_offset_x = (f64::from(horizontal_offset_px) * scale).round() as i32;
-    let physical_top_inset = (f64::from(top_inset_px.clamp(4, 64)) * scale).round() as i32;
+    // Allow top_inset_px = 0 for flush top-bezel Mac Notch docking
+    let physical_top_inset = (f64::from(top_inset_px.clamp(0, 64)) * scale).round() as i32;
 
     let centered_x =
         mon_x + ((mon_width as i32 - physical_width) / 2) + physical_offset_x;
@@ -99,7 +106,7 @@ pub fn calculate_clamped_bounds(
     let clamped_x = centered_x.clamp(min_x, max_x);
 
     let desired_y = mon_y + physical_top_inset;
-    let min_y = mon_y + 4;
+    let min_y = mon_y;
     let max_y = (mon_y + mon_height as i32 - physical_height - 8).max(min_y);
     let clamped_y = desired_y.clamp(min_y, max_y);
 
@@ -115,11 +122,15 @@ pub fn apply_island_bounds<R: Runtime>(
     horizontal_offset_px: i32,
     top_inset_px: i32,
 ) -> Result<(), String> {
-    let logical_width = ISLAND_WIDTH_LOGICAL;
+    let logical_width = if expanded {
+        ISLAND_WIDTH_LOGICAL
+    } else {
+        NOTCH_COLLAPSED_WIDTH_LOGICAL
+    };
     let logical_height = if expanded {
         ISLAND_EXPANDED_HEIGHT_LOGICAL
     } else {
-        ISLAND_COLLAPSED_HEIGHT_LOGICAL
+        NOTCH_COLLAPSED_HEIGHT_LOGICAL
     };
 
     window
@@ -172,30 +183,30 @@ mod tests {
 
     #[test]
     fn test_single_monitor_1080p_100_percent_dpi() {
-        // 1920x1080 @ 1.0 scale factor, centered with 10px top inset
-        let (x, y, w, h) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, 0, 10);
-        assert_eq!(w, 460);
-        assert_eq!(h, 78);
-        assert_eq!(x, (1920 - 460) / 2); // 730
-        assert_eq!(y, 10);
+        // 1920x1080 @ 1.0 scale factor, centered with 0px top inset (flush notch)
+        let (x, y, w, h) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, 0, 0);
+        assert_eq!(w, 340);
+        assert_eq!(h, 38);
+        assert_eq!(x, (1920 - 340) / 2); // 790
+        assert_eq!(y, 0);
     }
 
     #[test]
     fn test_expanded_bounds_calculation() {
-        let (x, y, w, h) = calculate_clamped_bounds(true, 1.0, 0, 0, 1920, 1080, 0, 10);
+        let (x, y, w, h) = calculate_clamped_bounds(true, 1.0, 0, 0, 1920, 1080, 0, 0);
         assert_eq!(w, 460);
-        assert_eq!(h, 604);
+        assert_eq!(h, 564);
         assert_eq!(x, 730);
-        assert_eq!(y, 10);
+        assert_eq!(y, 0);
     }
 
     #[test]
     fn test_dual_monitor_negative_coordinates() {
         // Secondary monitor to the left: x = -1920, y = 0, 1920x1080 @ 1.0 scale
         let (x, y, w, h) = calculate_clamped_bounds(false, 1.0, -1920, 0, 1920, 1080, 0, 10);
-        assert_eq!(w, 460);
-        assert_eq!(h, 78);
-        assert_eq!(x, -1920 + (1920 - 460) / 2); // -1190
+        assert_eq!(w, 340);
+        assert_eq!(h, 38);
+        assert_eq!(x, -1920 + (1920 - 340) / 2); // -1130
         assert_eq!(y, 10);
     }
 
@@ -203,9 +214,9 @@ mod tests {
     fn test_1440p_125_percent_fractional_dpi() {
         // 2560x1440 @ 1.25 scale factor
         let (x, y, w, h) = calculate_clamped_bounds(false, 1.25, 0, 0, 2560, 1440, 0, 10);
-        assert_eq!(w, 575); // (460 * 1.25)
-        assert_eq!(h, 98); // (78 * 1.25 = 97.5 rounded)
-        assert_eq!(x, (2560 - 575) / 2); // 992
+        assert_eq!(w, 425); // (340 * 1.25)
+        assert_eq!(h, 48); // (38 * 1.25 = 47.5 rounded)
+        assert_eq!(x, (2560 - 425) / 2); // 1067
         assert_eq!(y, 13); // 10 * 1.25 = 12.5 rounded 13
     }
 
@@ -213,9 +224,9 @@ mod tests {
     fn test_4k_200_percent_high_dpi() {
         // 3840x2160 @ 2.0 scale factor
         let (x, y, w, h) = calculate_clamped_bounds(false, 2.0, 0, 0, 3840, 2160, 0, 10);
-        assert_eq!(w, 920); // 460 * 2
-        assert_eq!(h, 156); // 78 * 2
-        assert_eq!(x, (3840 - 920) / 2); // 1460
+        assert_eq!(w, 680); // 340 * 2
+        assert_eq!(h, 76); // 38 * 2
+        assert_eq!(x, (3840 - 680) / 2); // 1580
         assert_eq!(y, 20); // 10 * 2
     }
 
@@ -229,9 +240,12 @@ mod tests {
         let (x_left, _, _, _) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, -9999, 10);
         assert_eq!(x_left, 8);
 
-        // Top inset clamped to [4, 64]
-        let (_, y_min, _, _) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, 0, 0);
-        assert_eq!(y_min, 4);
+        // Top inset clamped to [0, 64] for flush top-bezel docking
+        let (_, y_min, _, _) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, 0, -20);
+        assert_eq!(y_min, 0);
+
+        let (_, y_zero, _, _) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, 0, 0);
+        assert_eq!(y_zero, 0);
 
         let (_, y_max, _, _) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, 0, 500);
         assert_eq!(y_max, 64);

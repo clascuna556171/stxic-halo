@@ -42,9 +42,9 @@ const statusLabel: Record<Agent['status'], string> = {
 };
 
 const providerBadge: Record<Agent['provider'], string> = {
-  'claude-code': 'CLAUDE',
-  codex: 'CODEX',
-  other: 'AGENT',
+  'claude-code': 'Claude',
+  codex: 'Codex',
+  other: 'Agent',
 };
 
 export const AgentCard = memo(function AgentCard({ agent }: { agent: Agent }) {
@@ -54,7 +54,7 @@ export const AgentCard = memo(function AgentCard({ agent }: { agent: Agent }) {
       <div className="agent-head">
         <div className="agent-identity">
           <span className={`provider-chip ${agent.provider}`}>
-            <Icon size={13} />
+            <Icon size={12} />
             {providerBadge[agent.provider]}
           </span>
           <strong className="agent-name">{agent.name}</strong>
@@ -63,17 +63,17 @@ export const AgentCard = memo(function AgentCard({ agent }: { agent: Agent }) {
           </span>
           {agent.liveness === 'alive' && (
             <span className="live-tag tabular" title="Matching provider process confirmed active">
-              ALIVE
+              Alive
             </span>
           )}
           {agent.liveness === 'exited' && (
             <span className="exited-tag tabular" title="Provider process exited without Stop hook">
-              EXITED
+              Exited
             </span>
           )}
           {agent.isStale && (
             <span className="stale-tag tabular" title="No recent hook events received">
-              STALE
+              Stale
             </span>
           )}
         </div>
@@ -134,11 +134,11 @@ export const AttentionCard = memo(function AttentionCard({
     <section className="attention-card" aria-label="Action required">
       <div className="attention-top">
         <div className="attention-heading">
-          <AlertTriangle size={14} />
-          <span>{alert.reason === 'workspace-conflict' ? 'WORKSPACE COLLISION' : 'ACTION REQUIRED'}</span>
+          <AlertTriangle size={13} />
+          <span>{alert.reason === 'workspace-conflict' ? 'Workspace collision' : 'Action required'}</span>
         </div>
         <span className="attention-source tabular">
-          {agent.workspace} · {agent.isDemo ? 'DEMO FIXTURE' : 'LIVE HOOK'}
+          {agent.workspace} · {agent.isDemo ? 'fixture' : 'live hook'}
         </span>
       </div>
       <div className="attention-body">
@@ -191,8 +191,8 @@ export const MetricStrip = memo(function MetricStrip({
     >
       <div className="metric-tile">
         <div className="metric-label">
-          <Cpu size={13} />
-          <span>CPU LOAD</span>
+          <Cpu size={12.5} />
+          <span>CPU load</span>
         </div>
         <div className="metric-value-row">
           <strong>{metrics ? percent(metrics.cpu_percent) : '—'}</strong>
@@ -200,27 +200,48 @@ export const MetricStrip = memo(function MetricStrip({
             {metrics && metrics.cpu_percent > 80 ? 'elevated' : 'nominal'}
           </span>
         </div>
+        <div className="progress-track" aria-hidden="true">
+          <div
+            className={`progress-fill ${metrics && metrics.cpu_percent > 80 ? 'warning' : 'blue'}`}
+            style={{ width: `${Math.min(100, Math.max(0, metrics?.cpu_percent ?? 0))}%` }}
+          />
+        </div>
       </div>
 
       <div className="metric-tile">
         <div className="metric-label">
-          <HardDrive size={13} />
-          <span>MEMORY</span>
+          <HardDrive size={12.5} />
+          <span>Memory</span>
         </div>
         <div className="metric-value-row">
           <strong>{metrics ? gib(metrics.memory_used_bytes) : '—'}</strong>
           <span className="metric-sub">{memoryPct !== null ? `${memoryPct}%` : ''}</span>
         </div>
+        <div className="progress-track" aria-hidden="true">
+          <div
+            className={`progress-fill ${memoryPct !== null && memoryPct > 85 ? 'warning' : ''}`}
+            style={{ width: `${Math.min(100, Math.max(0, memoryPct ?? 0))}%` }}
+          />
+        </div>
       </div>
 
       <div className="metric-tile">
         <div className="metric-label">
-          <Gauge size={13} />
-          <span>PROCESSES</span>
+          <Gauge size={12.5} />
+          <span>Processes</span>
         </div>
         <div className="metric-value-row">
           <strong>{metrics ? metrics.process_count : '—'}</strong>
           <span className="metric-sub">{pollSec}s poll</span>
+        </div>
+        <div className="progress-track" aria-hidden="true">
+          <div
+            className="progress-fill"
+            style={{
+              width: `${metrics ? Math.min(100, Math.round((metrics.process_count / 400) * 100)) : 0}%`,
+              opacity: 0.55,
+            }}
+          />
         </div>
       </div>
     </div>
@@ -552,7 +573,8 @@ export const ActivityView = memo(function ActivityView({
                 <span
                   className={`verify-badge ${agent.isDemo ? 'fixture' : proof?.verified ? 'verified' : 'unverified'}`}
                 >
-                  {agent.isDemo ? 'FIXTURE' : proof?.verified ? 'VERIFIED' : 'UNVERIFIED'}
+                  {!agent.isDemo && proof?.verified && <ShieldCheck size={11} />}
+                  {agent.isDemo ? 'Fixture' : proof?.verified ? 'Verified' : 'Unverified'}
                 </span>
               </div>
 

@@ -41,7 +41,7 @@ impl Default for UserSettings {
             poll_interval_ms: 2500,
             target_monitor_index: 0,
             horizontal_offset_px: 0,
-            top_inset_px: 10,
+            top_inset_px: 0,
             auto_collapse_on_blur: false,
             reduce_motion: false,
             alert_on_waiting: true,
@@ -169,7 +169,7 @@ impl UserSettings {
         self.poll_interval_ms = self.poll_interval_ms.clamp(1000, 15000);
         self.target_monitor_index = self.target_monitor_index.min(16);
         self.horizontal_offset_px = self.horizontal_offset_px.clamp(-1600, 1600);
-        self.top_inset_px = self.top_inset_px.clamp(4, 64);
+        self.top_inset_px = self.top_inset_px.clamp(0, 64);
         self.stale_minutes = self.stale_minutes.clamp(5, 120);
         dedupe_workspaces(&mut self.approved_workspaces);
         self

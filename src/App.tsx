@@ -662,23 +662,36 @@ export default function App() {
   }, [expanded]);
 
   const activeWorking = shownAgents.filter((a) => a.status === 'working').length;
+  const leadWorkingAgent = shownAgents.find((a) => a.status === 'working') ?? shownAgents[0];
   const leadAlert = activeAlerts[0];
   const leadAttention = leadAlert?.agent;
   const failedCount = leadAttention?.proof?.testsFailed ?? 0;
 
+  const ledStatusClass = activeAlerts.length > 0
+    ? 'waiting'
+    : activeWorking > 0
+      ? 'working'
+      : 'idle';
+
   const pillHeadline = leadAttention
-    ? `${leadAttention.name} awaiting review`
-    : activeWorking
-      ? `${activeWorking} session${activeWorking === 1 ? '' : 's'} working`
-      : 'Idle · Watching workspace';
+    ? leadAttention.name
+    : leadWorkingAgent
+      ? leadWorkingAgent.name
+      : 'STXIC Halo';
 
   const pillSub = leadAttention
-    ? `${leadAttention.workspace} · ${failedCount > 0 ? `${failedCount} failed` : 'approval'}`
-    : demo
-      ? `demo fixture · ${shownAgents.length} sessions`
-      : `${shownAgents.length} sessions monitored`;
+    ? failedCount > 0
+      ? `${failedCount} test fail`
+      : 'awaiting review'
+    : leadWorkingAgent
+      ? leadWorkingAgent.workspace
+      : demo
+        ? 'fixture'
+        : 'standby';
 
   const pollSecLabel = `${(settings.poll_interval_ms / 1000).toFixed(1).replace(/\.0$/, '')}s`;
+  const activeTabIndex = Math.max(0, TABS.findIndex((t) => t.name === tab));
+  const isFloatingBezel = settings.top_inset_px > 0;
 
   return (
     <ErrorBoundary onReset={() => setExpanded(false)}>
@@ -693,45 +706,46 @@ export default function App() {
             <button
               ref={collapsedPillRef}
               type="button"
-              className={`collapsed-pill ${activeAlerts.length ? 'has-warning' : ''}`}
+              className={`collapsed-pill ${activeAlerts.length ? 'has-warning' : ''} ${isFloatingBezel ? 'floating-bezel' : ''}`}
               onClick={() => setExpanded(true)}
               aria-label="Expand STXIC Halo telemetry console (Alt+H or Enter)"
               title="Expand console (Alt+H or Enter)"
             >
-              <span className={`halo-mini ${activeAlerts.length ? 'warning' : 'healthy'}`}>
-                <HaloMark size={22} />
+              <span className="notch-left">
+                <span className={`notch-led ${ledStatusClass}`} aria-hidden="true" />
+                <span className="pill-main">
+                  <span className="pill-title">{pillHeadline}</span>
+                  <span className="pill-sep" aria-hidden="true">·</span>
+                  <span className="pill-subtitle tabular">{pillSub}</span>
+                </span>
               </span>
 
-              <span className="pill-main">
-                <span className="pill-title">{pillHeadline}</span>
-                <span className="pill-subtitle tabular">{pillSub}</span>
+              <span className="notch-right">
+                <span
+                  className={`pill-telemetry tabular ${activeAlerts.length ? 'warning' : 'healthy'}`}
+                >
+                  {failedCount > 0
+                    ? `${failedCount} fail`
+                    : shownMetrics
+                      ? `${percent(shownMetrics.cpu_percent)} · ${gib(shownMetrics.memory_used_bytes)}`
+                      : 'Local'}
+                </span>
+                <ChevronDown size={13} className="pill-chevron" />
               </span>
-
-              <span
-                className={`pill-telemetry tabular ${activeAlerts.length ? 'warning' : 'healthy'}`}
-              >
-                {failedCount > 0
-                  ? `${failedCount} FAIL`
-                  : shownMetrics
-                    ? `CPU ${percent(shownMetrics.cpu_percent)} · ${gib(shownMetrics.memory_used_bytes)}`
-                    : 'LOCAL'}
-              </span>
-
-              <ChevronDown size={14} className="pill-chevron" />
             </button>
           ) : (
-            <div className="expanded-card">
+            <div className={`expanded-card ${isFloatingBezel ? 'floating-bezel' : ''}`}>
               <header className="island-header">
                 <div className="brand-header">
                   <div className="brand-square">
-                    <HaloMark size={22} />
+                    <HaloMark size={18} />
                   </div>
                   <div className="stack-tight">
                     <strong className="brand-wordmark">
-                      stxic<span className="mint-text">halo</span>
+                      STXIC <span className="mint-text">Halo</span>
                     </strong>
                     <span className="tiny muted tabular">
-                      {demo ? 'SIMULATED FIXTURE' : 'LOCAL SENTINEL'}
+                      {demo ? 'Simulated fixture' : 'Local sentinel'}
                     </span>
                   </div>
                 </div>
@@ -744,7 +758,7 @@ export default function App() {
                     title="Switch between simulated fixture and local telemetry"
                   >
                     <FlaskConical size={11} />
-                    <span>{demo ? 'DEMO' : 'LIVE'}</span>
+                    <span>{demo ? 'Fixture' : 'Live'}</span>
                   </button>
                   <button
                     type="button"
@@ -753,13 +767,13 @@ export default function App() {
                     aria-label="Collapse island (Escape)"
                     title="Collapse (Esc)"
                   >
-                    <ChevronUp size={16} />
+                    <ChevronUp size={15} />
                   </button>
                 </div>
               </header>
 
               <nav
-                className="tabs"
+                className="tabs segmented-control"
                 role="tablist"
                 aria-label="Console views"
                 onKeyDown={(e) => {
@@ -781,6 +795,11 @@ export default function App() {
                   }
                 }}
               >
+                <div
+                  className="segmented-slider"
+                  style={{ transform: `translateX(${activeTabIndex * 100}%)` }}
+                  aria-hidden="true"
+                />
                 {TABS.map(({ name, title, icon: Icon }) => (
                   <button
                     type="button"
@@ -791,10 +810,10 @@ export default function App() {
                     aria-selected={tab === name}
                     aria-controls={`halo-panel-${name}`}
                     tabIndex={tab === name ? 0 : -1}
-                    className={`tab ${tab === name ? 'active' : ''}`}
+                    className={`tab segmented-item ${tab === name ? 'active' : ''}`}
                     onClick={() => setTab(name)}
                   >
-                    <Icon size={13} />
+                    <Icon size={12.5} />
                     <span>{title}</span>
                     {name === 'activity' && activeAlerts.length > 0 && (
                       <span className="tab-count tabular">{activeAlerts.length}</span>

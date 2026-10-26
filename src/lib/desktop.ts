@@ -24,9 +24,10 @@ import type {
   UserSettings,
 } from '../types';
 
+export const NOTCH_COLLAPSED_WIDTH = 340;
 export const ISLAND_WIDTH = 460;
-export const ISLAND_COLLAPSED_HEIGHT = 78;
-export const ISLAND_EXPANDED_HEIGHT = 604;
+export const ISLAND_COLLAPSED_HEIGHT = 38;
+export const ISLAND_EXPANDED_HEIGHT = 564;
 
 export const isDesktop = (): boolean => isTauri();
 
@@ -175,13 +176,13 @@ export function calculatePhysicalBounds(
   monitor: { x: number; y: number; width: number; height: number; scaleFactor: number },
   settings: Pick<UserSettings, 'horizontal_offset_px' | 'top_inset_px'>
 ): { x: number; y: number; width: number; height: number; physicalWidth: number; physicalHeight: number } {
-  const logicalWidth = ISLAND_WIDTH;
+  const logicalWidth = expanded ? ISLAND_WIDTH : NOTCH_COLLAPSED_WIDTH;
   const logicalHeight = expanded ? ISLAND_EXPANDED_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
   const scale = Math.max(0.5, monitor.scaleFactor);
   const physicalWidth = Math.round(logicalWidth * scale);
   const physicalHeight = Math.round(logicalHeight * scale);
   const physicalOffsetX = Math.round(settings.horizontal_offset_px * scale);
-  const topInset = Math.round(Math.max(4, Math.min(64, settings.top_inset_px)) * scale);
+  const topInset = Math.round(Math.max(0, Math.min(64, settings.top_inset_px)) * scale);
 
   const rawX = monitor.x + Math.round((monitor.width - physicalWidth) / 2) + physicalOffsetX;
   const minX = monitor.x + 8;
@@ -189,7 +190,7 @@ export function calculatePhysicalBounds(
   const x = Math.max(minX, Math.min(maxX, rawX));
 
   const rawY = monitor.y + topInset;
-  const minY = monitor.y + 4;
+  const minY = monitor.y;
   const maxY = Math.max(minY, monitor.y + monitor.height - physicalHeight - 8);
   const y = Math.max(minY, Math.min(maxY, rawY));
 
@@ -197,7 +198,7 @@ export function calculatePhysicalBounds(
 }
 
 /**
- * Keeps the desktop window tightly fitted to the capsule in collapsed (78px) or expanded (604px)
+ * Keeps the desktop window tightly fitted to the capsule in collapsed (340x38 notch) or expanded (460x564 island)
  * states so there is never an invisible desktop-wide click blocker, while honoring multi-monitor
  * selection, DPI scaling, and off-screen coordinate clamping.
  */
@@ -223,7 +224,7 @@ export async function fitIsland(
   }
 
   const win = getCurrentWindow();
-  const width = ISLAND_WIDTH;
+  const width = expanded ? ISLAND_WIDTH : NOTCH_COLLAPSED_WIDTH;
   const height = expanded ? ISLAND_EXPANDED_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
   await win.setSize(new LogicalSize(width, height));
 

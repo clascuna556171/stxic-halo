@@ -19,7 +19,7 @@ Add-Type @'
 using System;
 using System.Runtime.InteropServices;
 public class Launcher {
-  [StructLayout(LayoutKind.Sequential)]
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
   public struct STARTUPINFO {
     public int cb;
     public string lpReserved;
@@ -70,7 +70,16 @@ $pi = New-Object Launcher+PROCESS_INFORMATION
 
 $ok = [Launcher]::CreateProcessW($null, $fullTarget, [IntPtr]::Zero, [IntPtr]::Zero, $false, 0, [IntPtr]::Zero, $null, [ref]$si, [ref]$pi)
 if (-not $ok) {
-  throw "Failed to launch on WinSta0\Default. Error code: $([System.Runtime.InteropServices.Marshal]::GetLastWin32Error())"
+  $shell = New-Object -ComObject Shell.Application
+  $shell.ShellExecute($fullTarget)
+  Start-Sleep -Seconds 2
+  $proc = Get-Process -Name "stxic-halo" -ErrorAction SilentlyContinue | Sort-Object StartTime -Descending | Select-Object -First 1
+  if ($proc) {
+    Write-Output "STXIC Halo running on WinSta0\Default (via Shell.Application) with PID: $($proc.Id)"
+  } else {
+    $proc = Start-Process -FilePath $fullTarget -PassThru
+    Write-Output "STXIC Halo running with PID: $($proc.Id)"
+  }
+} else {
+  Write-Output "STXIC Halo running on WinSta0\Default with PID: $($pi.dwProcessId)"
 }
-
-Write-Output "STXIC Halo running on WinSta0\Default with PID: $($pi.dwProcessId)"

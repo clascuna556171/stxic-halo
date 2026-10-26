@@ -57,7 +57,7 @@ import type {
 const TAB_ORDER: readonly Tab[] = ['overview', 'activity', 'system', 'settings'];
 
 export function useHaloRuntime() {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [tab, setTab] = useState<Tab>('overview');
   const [demo, setDemo] = useState(() => !isDesktop());
   const [settings, setSettings] = useState<UserSettings>(() => loadLocalSettings());
@@ -193,7 +193,7 @@ export function useHaloRuntime() {
             ...prev,
             target_monitor_index: 0,
             horizontal_offset_px: 0,
-            top_inset_px: 10,
+            top_inset_px: 0,
           })
         );
       },
