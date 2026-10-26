@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     sync::Mutex,
@@ -6,7 +6,7 @@ use std::{
 };
 
 /// Rolling timing statistics for one instrumented operation.
-#[derive(Debug, Clone, Default, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct TimingStat {
     pub count: u64,
     pub last_ms: f64,

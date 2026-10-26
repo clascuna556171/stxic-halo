@@ -12,6 +12,7 @@ import {
   clearEvents,
   disableClaudeHook,
   enableClaudeHook,
+  exportDiagnosticBundle,
   fitIsland,
   getLaunchAtLogin,
   isDesktop,
@@ -40,6 +41,7 @@ import type {
   AgentEvent,
   AlertItem,
   ClaudeHookStatus,
+  DiagnosticBundleExport,
   IntegrationStatus,
   LaunchAtLoginStatus,
   Metrics,
@@ -530,6 +532,26 @@ export function useHaloRuntime() {
     }
   }, []);
 
+  const [exportingBundle, setExportingBundle] = useState(false);
+  const [exportResult, setExportResult] = useState<DiagnosticBundleExport | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExportDiagnosticBundle = useCallback(async () => {
+    setExportingBundle(true);
+    setExportError(null);
+    try {
+      const bundle = await exportDiagnosticBundle();
+      setExportResult(bundle);
+      return bundle;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setExportError(msg);
+      throw err;
+    } finally {
+      setExportingBundle(false);
+    }
+  }, []);
+
   const pollSummary: PollTimingSummary = useMemo(
     () => summarizePollTimings(pollTimings),
     [pollTimings]
@@ -573,5 +595,9 @@ export function useHaloRuntime() {
     perfStats,
     refreshPerfStats,
     secondInstancePing,
+    handleExportDiagnosticBundle,
+    exportingBundle,
+    exportResult,
+    exportError,
   };
 }

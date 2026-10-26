@@ -199,6 +199,21 @@ export interface PerformanceStats {
   leak_analysis?: LeakAnalysis;
 }
 
+export interface DiagnosticBundleExport {
+  exported_at_unix_secs: number;
+  app_version: string;
+  os_family: string;
+  os_arch: string;
+  halo_pid: number;
+  settings_source: string;
+  settings_schema: number;
+  approved_workspace_count: number;
+  event_log_status: EventLogStatus;
+  leak_analysis: LeakAnalysis;
+  timings: Record<string, TimingStat>;
+  saved_to_file: string;
+}
+
 /** Frontend-measured poll round-trip summary (IPC + Rust work + React state). */
 export interface PollTimingSummary {
   samples: number;

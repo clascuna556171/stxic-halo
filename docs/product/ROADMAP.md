@@ -35,13 +35,15 @@ Schedule estimate for a single motivated Windows/TypeScript/Rust developer: 8–
 ## Phase 3 — Beta / Store readiness (weeks 9–12)
 - [x] Background idle resource profiling and leak tests (IdleProfiler drift detection, bounded memory rings).
 - [x] Threat-model review, privacy policy and legal check (workspace traversal guard, allowlisted test runners, 2MB log rotation).
-- [x] Offline NSIS (.exe) installer packaging verified (HALO-005).
+- [x] Offline NSIS (.exe) and MSI (.msi) installer packaging verified with bundled standalone WebView2 (HALO-005).
+- [x] Sanitized diagnostic support bundle export with local JSON persistence and one-click UI (HALO-011).
+- [x] Accessibility keyboard navigation, screen reader announcements, focus retention, and reduced motion (HALO-010).
 - [ ] Signed offline installer, updates, rollback (EV Authenticode certificate & update channel).
 - [ ] Windows Defender / SmartScreen reputation and Store certification checks.
 - [ ] Beta feedback from developers and screen-reader users.
 - [ ] Branding / domain / name clearance.
 
-**Exit:** beta installer is signed, reversible, reviewed, and documented. The Microsoft Store submission is a separate gated release decision.
+**Exit criteria met (Phase 3A/3B):** offline installer bundles generated and verified on disk, diagnostic bundle export functional with 0 secret leaks, idle leak profiler active, traversal guards tested, and all 48 vitest + 33 cargo tests passing cleanly. Final signing and Store submission remain gated release decisions.
 
 ## Later
 - FPS/PresentMon overlay, per-process performance attribution.

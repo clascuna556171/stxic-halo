@@ -55,7 +55,7 @@ impl Default for UserSettings {
 }
 
 /// Where the active settings came from on startup. Surfaced in the integration health panel.
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum SettingsSource {
     Disk,
@@ -63,7 +63,7 @@ pub enum SettingsSource {
     Defaults,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SettingsHealth {
     pub source: SettingsSource,
     pub path: String,

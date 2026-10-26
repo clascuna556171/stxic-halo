@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 pub const MAX_PROFILING_SAMPLES: usize = 120;
@@ -15,7 +15,7 @@ pub struct MemorySample {
     pub cpu_percent: f32,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct LeakAnalysis {
     pub sample_count: usize,
     pub baseline_memory_bytes: u64,

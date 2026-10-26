@@ -1,4 +1,4 @@
-# Project Status — 2026-10-26 (Updated v0.3.1 — Phase 3A Complete)
+# Project Status — 2026-10-26 (Updated v0.3.2 — Phase 3B Complete)
 
 | Area | Status | Details |
 |---|---|---|
@@ -17,29 +17,35 @@
 | Phase 3A: Windows Log-Rotation Hardening | Completed & verified | `src-tauri/src/events.rs::rotate_log_file` removes pre-existing `.bak` before rename with copy+truncate fallback on Windows; verified with `test_log_rotation_when_backup_file_already_exists`. |
 | Phase 3A: Workspace Traversal Guard | Completed & verified | `src-tauri/src/proof_of_work.rs` canonicalizes approved paths, strictly rejecting `..`, root escapes, or unapproved folders. |
 | Phase 3A: Privacy & Security Documentation | Completed & verified | Documented 2 MiB automatic rotation, zero-cloud local telemetry, and traversal guards in `SECURITY_PRIVACY.md` and `PRIVACY_POLICY_DRAFT.md`. |
+| Phase 3B: Offline Standalone Installer Bundles | Completed & verified | `npm run desktop:build:store` bundles Evergreen Standalone WebView2 into both NSIS (`STXIC Halo_0.1.0_x64-setup.exe`, 208.82 MiB) and MSI (`STXIC Halo_0.1.0_x64_en-US.msi`, 206.92 MiB) targets for air-gapped installation. |
+| Phase 3B: Sanitized Diagnostic Support Bundle | Completed & verified | HALO-011: `diagnostics.rs` generates sanitized JSON support bundles in `%LOCALAPPDATA%\STXICHalo` with one-click export button in Settings and zero sensitive prompt/code leakage. |
+| Phase 3B: Accessibility & Store Listing Alignment | Completed & verified | HALO-010 accessible keyboard shortcuts (`Alt+H`, `Alt+1..4`, `Esc`), focus retention, `aria-live` second-instance ping, and updated `STORE_LISTING.md` describing real shipped capabilities. |
 | Naming & brand assets | Implemented & verified | Concentric reticle vector geometry (`HaloMark.tsx`, `assets/brand/*.svg`, `src-tauri/icons/icon.ico` & `icon.png`) |
 | Modular React/TS architecture | Implemented & verified | Separated UI (`components/`), runtime controller (`hooks/useHaloRuntime.ts`), settings (`config/settings.ts`), adapters (`lib/agentEvents.ts`), and telemetry (`lib/telemetryHistory.ts`) |
 | Fault recovery (`ErrorBoundary`) | Implemented & verified | Catches render faults inside the floating island with one-click HUD reset |
 | Persistent user settings | Implemented & verified | Atomic JSON persistence in `%LOCALAPPDATA%\STXICHalo\settings.json` + `localStorage` mirror (poll cadence, monitor index, auto-collapse on blur, reduced motion, alert filters, approved workspaces, Codex logs toggle, process reconciliation) |
-| Tauri 2 Windows shell & tray | Implemented & verified | Modular `src-tauri/src/{paths,telemetry,events,config,window,proof_of_work,codex,claude_manager,perf,profiling,lib}.rs` with DPI-aware multi-monitor clamping, tight `460×78` collapsed bounds, and system tray recovery menu |
+| Tauri 2 Windows shell & tray | Implemented & verified | Modular `src-tauri/src/{paths,telemetry,events,config,window,proof_of_work,codex,claude_manager,perf,profiling,diagnostics,lib}.rs` with DPI-aware multi-monitor clamping, tight `460×78` collapsed bounds, and system tray recovery menu |
 | Low-overhead CPU/RAM/processes | Implemented & verified | Targeted `sysinfo` refresh (`CpuRefreshKind` + `MemoryRefreshKind`) with process count throttled to 10s intervals (`ProcessRefreshKind::nothing()`) |
 | Claude Code hook bridge | Hardened & verified | `scripts/claude-hook.ps1` with 2 MiB automatic rotation and 3-attempt shared-lock retry; Rust `EventLogReader` caches `(len, modified_ms)` to avoid redundant disk reads |
 | Proof-of-Work Verifier (v0.2) | Implemented & verified | Concrete `ProofOfWorkVerifierContract` in Rust (`proof_of_work.rs`) & TS (`proofOfWork.ts`) inspecting `git status --porcelain` and allowlisted test runners (`npm test`, `cargo test`, `pnpm test`, `yarn test`, `vitest run`, `pytest`) for user-approved workspaces |
 | Codex CLI Adapter (v0.2) | Implemented & verified | Live adapter in Rust (`codex.rs`) & TS (`codexAdapter.ts`) reading local Codex session rollout logs from `~/.codex/sessions`, extracting token counts, context window percentage, and session status with zero prompt/auth exposure |
 | Alert deduplication & staleness | Implemented & verified | Deterministic alert keys allow acknowledging blocking alerts without repeated nag; flags working/waiting sessions older than `stale_minutes` |
-| Microsoft Store build config | Prepared | `src-tauri/tauri.store.conf.json` (`offlineInstaller` WebView2 mode) + `npm run desktop:build:store` |
 | Gaming FPS Telemetry | Behind interface (v0.3+) | Extensible PresentMon / DXGI contract registered; disabled to guarantee zero-intrusion anti-cheat safety |
 
 ## Verification Summary (Current Workstation)
 - **Rust Toolchain:**
   - `rustup` (`stable-x86_64-pc-windows-msvc`, `rustc 1.99.1`, `cargo 1.99.1`) verified.
-  - `cargo test`: 32 Rust unit tests passing (32/32) across `events`, `proof_of_work`, `telemetry`, `claude_manager`, `config`, `perf`, `window`, `codex`, and `profiling`.
+  - `cargo test`: 33 Rust unit tests passing (33/33) across `events`, `proof_of_work`, `telemetry`, `claude_manager`, `config`, `perf`, `window`, `codex`, `profiling`, and `diagnostics`.
   - `cargo check`: Rust native crate compiles with 0 errors.
 - **Frontend & TypeScript:**
-  - `npm test` (`vitest run`): 9 test suites, 47 unit tests passing (`sessionReconciliation.test.ts`, `perfTiming.test.ts`, `claudeHook.test.ts`, `codexAdapter.test.ts`, `agentEvents.test.ts`, `windowBounds.test.ts`, `foundation.test.ts`, `proofOfWork.test.ts`, `leakProfiling.test.ts`).
+  - `npm test` (`vitest run`): 9 test suites, 48 unit tests passing (`sessionReconciliation.test.ts`, `perfTiming.test.ts`, `claudeHook.test.ts`, `codexAdapter.test.ts`, `agentEvents.test.ts`, `windowBounds.test.ts`, `foundation.test.ts`, `proofOfWork.test.ts`, `leakProfiling.test.ts`).
   - `npm run build` (`tsc --noEmit && vite build`): strict TypeScript typecheck and Vite production build (`dist/`) succeeded with 0 errors.
+- **Desktop Bundling & Packaging:**
+  - `npm run desktop:build:store` verified on Windows:
+    - NSIS setup executable: `STXIC Halo_0.1.0_x64-setup.exe` (208.82 MiB, SHA256 `CF8F0B2009E3C3ADCB70DA8D7A59010B665B513EF475AE06BE65DF86FD810C0D`).
+    - MSI package: `STXIC Halo_0.1.0_x64_en-US.msi` (206.92 MiB, SHA256 `5A58A8772A33AA48DF4D7C23F9664F66D53C19BBC963834689B9D4B9BBFC42A3`).
 - **Hook Bridges & Watcher:**
   - `scripts/manage-claude-hook.ps1` verified with `Status`, `Enable`, `Disable`, and `Rollback` commands.
   - Background `EventLogWatcher` thread verifies file truncation and 2 MiB rotation without locking disk files.
 - **Independent QA:**
-  - Verified by GitHub Copilot with `QA VERDICT: PASS` in `QA-visible-20261026-115055-869-d74b859b.txt`.
+  - Phase 3A verified with `QA VERDICT: PASS` in `QA-visible-20261026-115055-869-d74b859b.txt`. Phase 3B ready for independent review.

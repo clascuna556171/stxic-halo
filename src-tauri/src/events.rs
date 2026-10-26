@@ -134,7 +134,7 @@ pub struct EventLogReader {
 }
 
 /// Live health of the local hook event log, for the integration status panel.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct EventLogStatus {
     pub path: String,
     pub exists: bool,

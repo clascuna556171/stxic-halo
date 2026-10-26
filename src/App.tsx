@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   Cpu,
+  Download,
   FlaskConical,
   House,
   Info,
@@ -25,6 +26,7 @@ import { isDesktop } from './lib/desktop';
 import { gib, percent } from './lib/format';
 import type {
   ClaudeHookStatus,
+  DiagnosticBundleExport,
   IntegrationStatus,
   LaunchAtLoginStatus,
   MonitorDescriptor,
@@ -64,6 +66,10 @@ const SettingsView = memo(function SettingsView({
   launchAtLogin,
   onToggleLaunchAtLogin,
   integrationStatus,
+  onExportDiagnosticBundle,
+  exportingBundle = false,
+  exportResult,
+  exportError,
 }: {
   demo: boolean;
   setDemo: (value: boolean) => void;
@@ -83,6 +89,10 @@ const SettingsView = memo(function SettingsView({
   launchAtLogin?: LaunchAtLoginStatus | null;
   onToggleLaunchAtLogin?: (enabled: boolean) => Promise<LaunchAtLoginStatus>;
   integrationStatus?: IntegrationStatus | null;
+  onExportDiagnosticBundle?: () => Promise<DiagnosticBundleExport | null>;
+  exportingBundle?: boolean;
+  exportResult?: DiagnosticBundleExport | null;
+  exportError?: string | null;
 }) {
   const [workspaceInput, setWorkspaceInput] = useState('');
   return (
@@ -520,6 +530,35 @@ const SettingsView = memo(function SettingsView({
             Corrupt file preserved at: {integrationStatus.settings.quarantined_path}
           </div>
         )}
+
+        <div className="setting-divider" />
+        <div className="setting-row" style={{ padding: '8px 14px' }}>
+          <div className="setting-description">
+            <strong>Diagnostic support bundle (HALO-011)</strong>
+            <p>Export sanitized JSON diagnostics (OS, health, timings, leak analysis; zero code or secrets).</p>
+          </div>
+          {onExportDiagnosticBundle && (
+            <button
+              type="button"
+              className="inline-action"
+              disabled={exportingBundle}
+              onClick={() => void onExportDiagnosticBundle()}
+              title="Export sanitized diagnostic bundle to LocalAppData"
+            >
+              <Download size={12} /> {exportingBundle ? 'Exporting...' : 'Export Bundle'}
+            </button>
+          )}
+        </div>
+        {exportResult && (
+          <div style={{ padding: '4px 14px 10px', fontSize: '11px', color: 'var(--mint)' }}>
+            ✓ Bundle saved: <code className="mono-path">{exportResult.saved_to_file}</code>
+          </div>
+        )}
+        {exportError && (
+          <div style={{ padding: '4px 14px 10px', fontSize: '11px', color: 'var(--coral)' }}>
+            ⚠️ Export failed: {exportError}
+          </div>
+        )}
       </div>
 
       <div className="section-heading">
@@ -601,6 +640,10 @@ export default function App() {
     integrationStatus,
     perfStats,
     secondInstancePing,
+    handleExportDiagnosticBundle,
+    exportingBundle,
+    exportResult,
+    exportError,
   } = useHaloRuntime();
 
   const collapsedPillRef = useRef<HTMLButtonElement>(null);
@@ -817,6 +860,10 @@ export default function App() {
                     launchAtLogin={launchAtLogin}
                     onToggleLaunchAtLogin={handleToggleLaunchAtLogin}
                     integrationStatus={integrationStatus}
+                    onExportDiagnosticBundle={handleExportDiagnosticBundle}
+                    exportingBundle={exportingBundle}
+                    exportResult={exportResult}
+                    exportError={exportError}
                   />
                 )}
               </main>

@@ -13,6 +13,7 @@ import type {
   AgentEvent,
   ClaudeHookStatus,
   CodexSessionTelemetry,
+  DiagnosticBundleExport,
   IntegrationStatus,
   LaunchAtLoginStatus,
   Metrics,
@@ -431,4 +432,39 @@ export async function subscribeEventsUpdated(
   } catch {
     return () => {};
   }
+}
+
+export async function exportDiagnosticBundle(): Promise<DiagnosticBundleExport> {
+  if (!isTauri()) {
+    return {
+      exported_at_unix_secs: Math.floor(Date.now() / 1000),
+      app_version: '0.1.0',
+      os_family: 'windows (browser mock)',
+      os_arch: 'x86_64',
+      halo_pid: 0,
+      settings_source: 'defaults',
+      settings_schema: 2,
+      approved_workspace_count: 0,
+      event_log_status: {
+        path: '%LOCALAPPDATA%\\STXICHalo\\events.jsonl',
+        exists: false,
+        size_bytes: 0,
+        modified_ms: null,
+        buffered_events: 0,
+        last_error: null,
+      },
+      leak_analysis: {
+        sample_count: 0,
+        baseline_memory_bytes: 0,
+        current_memory_bytes: 0,
+        drift_bytes: 0,
+        drift_rate_kb_per_min: 0,
+        suspected_leak: false,
+        status: 'Uninitialized (mock)',
+      },
+      timings: {},
+      saved_to_file: '%LOCALAPPDATA%\\STXICHalo\\support-bundle-mock.json',
+    };
+  }
+  return invoke<DiagnosticBundleExport>('export_diagnostic_bundle');
 }

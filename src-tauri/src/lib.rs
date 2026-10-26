@@ -1,6 +1,7 @@
 pub mod claude_manager;
 pub mod codex;
 pub mod config;
+pub mod diagnostics;
 pub mod events;
 pub mod paths;
 pub mod perf;
@@ -10,6 +11,7 @@ pub mod telemetry;
 pub mod window;
 
 use config::{SettingsHealth, UserSettings};
+use diagnostics::{create_diagnostic_bundle, DiagnosticBundleExport};
 use events::{AgentEvent, EventLogReader, EventLogStatus, EventLogWatcher};
 use perf::{PerfRegistry, TimingStat};
 use profiling::{IdleProfiler, LeakAnalysis, MemorySample};
@@ -274,6 +276,47 @@ fn read_idle_profile(profiler: State<'_, Mutex<IdleProfiler>>) -> Result<LeakAna
     Ok(guard.analyze())
 }
 
+#[tauri::command]
+fn export_diagnostic_bundle(
+    settings: State<'_, Mutex<UserSettings>>,
+    health: State<'_, Mutex<SettingsHealth>>,
+    reader: State<'_, Arc<Mutex<EventLogReader>>>,
+    perf: State<'_, Arc<PerfRegistry>>,
+    profiler: State<'_, Mutex<IdleProfiler>>,
+) -> Result<DiagnosticBundleExport, String> {
+    let health_snapshot = health
+        .lock()
+        .map(|h| h.clone())
+        .map_err(|_| "Settings health lock poisoned".to_string())?;
+
+    let approved_count = settings
+        .lock()
+        .map(|s| s.approved_workspaces.len())
+        .unwrap_or(0);
+
+    let event_log_status = reader
+        .lock()
+        .map(|r| r.status())
+        .map_err(|_| "Event log reader lock poisoned".to_string())?;
+
+    let leak_analysis = profiler
+        .lock()
+        .map(|p| p.analyze())
+        .unwrap_or_else(|_| LeakAnalysis::default());
+
+    let timings = perf.snapshot();
+    let export_dir = paths::ensure_app_data_dir()?;
+
+    create_diagnostic_bundle(
+        &health_snapshot,
+        approved_count,
+        event_log_status,
+        leak_analysis,
+        timings,
+        &export_dir,
+    )
+}
+
 fn setup_system_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let show_item = MenuItem::with_id(app, "show", "Show STXIC Halo", true, None::<&str>)?;
     let toggle_item =
@@ -402,6 +445,7 @@ pub fn run() {
             read_integration_status,
             read_performance_stats,
             read_idle_profile,
+            export_diagnostic_bundle,
             proof_of_work::verify_proof_of_work,
             proof_of_work::approve_workspace,
             proof_of_work::revoke_workspace,

@@ -2,31 +2,32 @@
 
 **Name:** STXIC Halo
 **Category:** Productivity / Developer tools (choose available Store category at submission)
-**Short description:** A quiet Windows companion for AI agent activity and local system health.
+**Short description:** A quiet, local-first Windows HUD companion for AI coding agent activity, verification evidence, and system health.
 **Tagline:** Stay in flow. Halo keeps watch.
 
-## Draft description for the current prototype
-STXIC Halo is a minimal floating capsule for Windows developers. Keep an eye on local CPU and memory usage while viewing lifecycle events from connected AI coding agents. Expand the pill to see session activity, system readings and opt-in integration settings. Halo prioritizes on-device data and labels unavailable metrics honestly.
+## Store Description
+STXIC Halo is a low-distraction, top-edge floating Windows companion designed for developers running AI coding agents (Claude Code, Codex, and terminal runners). Halo monitors local CPU/RAM pressure, tracks agent lifecycle hooks, detects concurrent file collisions across multiple sessions, and surfaces evidence-backed Proof-of-Work (Git status summaries and test runner outcomes).
 
-**Current preview:** live local CPU/RAM and manually configured Claude Code lifecycle events in the Windows build, with an optional simulated demo to explore the UI. Further integrations and verification capabilities are planned.
+Halo prioritizes truth-over-vibes: on-device data is never faked, unavailable metrics are honestly labelled, and zero prompt contents, code, or tokens leave your machine.
 
-## Feature bullets (for launch after validation)
-- Floating expandable Windows workspace companion.
-- Locally sampled CPU and RAM insights.
-- Opt-in Claude Code agent lifecycle status.
-- Separate, explicitly labelled live and preview data.
-- Local-first design with no required cloud account.
+## Key Features
+- **Compact Floating Capsule:** Top-edge Windows HUD (460×78) with DPI-aware multi-monitor clamping, keyboard shortcuts (Alt+H, Alt+1..4, Esc), and tray icon recovery.
+- **Proof-of-Work & Evidence Inspector:** Inspect structured Git diff breakdowns (staged, modified, untracked) and opt-in test results (vitest, cargo test, pytest) for user-authorized workspaces.
+- **Multi-Session Collision Detection:** Real-time warnings when two active agent sessions edit intersecting workspace files.
+- **Agent Lifecycle Adapters:** 1-click Claude Code hook management with backup rollback, plus local Codex session rollout log reader.
+- **Local System Telemetry & Idle Leak Profiling:** On-device CPU and memory monitoring, background process lifecycle reconciliation, and statistical memory drift detection.
+- **Sanitized Diagnostic Support Bundle:** One-click export of local health and timing metrics without sensitive personal code, transcripts, or keys.
+- **Offline Standalone Installer:** Self-contained setup bundles (NSIS & MSI) with bundled WebView2 for air-gapped installation.
+- **100% Zero-Cloud Telemetry:** No mandatory account, no tracking cookies, and no hidden data transmissions.
 
-## Assets checklist
+## Assets & Publishing Checklist
 - [ ] Square Store app logo 300x300 (review current platform guidelines)
-- [ ] Compliant screenshots at actual supported UI dimensions
-- [ ] Transparent PNG app mark, 256x256 or recommended sizes
+- [ ] Compliant screenshots at actual supported UI dimensions (1080p, 1440p, 4K)
+- [ ] Transparent PNG app mark, 256x256
 - [ ] Header/hero image if required by listing format
 - [ ] Support and privacy policy URLs (owned domains)
-- [ ] Updated legal and trademark rights confirmations
-- [ ] Exact feature list matching shipping build
+- [ ] Partner Center product name reservation
+- [ ] Authenticode signing certificate applied to installer binaries
 
-## Possible short callouts
+## Short Callouts
 "A quick glance at your workspace." / "Focus on building, not checking." / "Agent activity meets Windows performance."
-
-**Avoid** claims such as "automatically verifies all AI agent work" or "tracks all Codex token limits" until there is validated implementation.

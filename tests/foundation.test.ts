@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, sanitizeSettings } from '../src/config/settings';
 import { gib, percent, relativeTime } from '../src/lib/format';
+import { exportDiagnosticBundle } from '../src/lib/desktop';
 import {
   appendMetricsSample,
   EMPTY_METRICS_HISTORY,
@@ -81,5 +82,18 @@ describe('formatting utilities', () => {
     expect(gib(8 * 1024 ** 3)).toBe('8.0 GB');
     expect(relativeTime(new Date().toISOString())).toBe('Just now');
     expect(relativeTime('invalid-date')).toBe('Unknown');
+  });
+});
+
+describe('diagnostic bundle export contract (HALO-011)', () => {
+  it('generates sanitized diagnostic bundle without prompt text or customer code', async () => {
+    const bundle = await exportDiagnosticBundle();
+    expect(bundle.app_version).toBe('0.1.0');
+    expect(bundle.settings_schema).toBe(2);
+    expect(bundle.approved_workspace_count).toBeGreaterThanOrEqual(0);
+    expect(bundle.saved_to_file).toContain('support-bundle');
+    expect((bundle as any).prompt).toBeUndefined();
+    expect((bundle as any).apiKey).toBeUndefined();
+    expect((bundle as any).code).toBeUndefined();
   });
 });
