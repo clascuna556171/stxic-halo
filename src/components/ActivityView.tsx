@@ -21,9 +21,9 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
   onWorkspaceSettings: (path: string) => void;
 }) {
   const workspaces = activityWorkspaces(agents, events);
-  const [selection, setSelection] = useState<string | null>(null);
-  const firstWorkspace = workspaces[0]?.key;
-  useEffect(() => { if (selection === null && firstWorkspace) setSelection(firstWorkspace); }, [selection, firstWorkspace]);
+  const [selection, setSelection] = useState('');
+  const [checkSelection, setCheckSelection] = useState('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(6);
   const [providerFilter, setProviderFilter] = useState(() => readFilter('provider', ['all', ...Object.keys(PROVIDER_NAMES)]));
   const [eventFilter, setEventFilter] = useState(() => readFilter('event', ['all', 'attention', 'PermissionRequest', 'Error']));
@@ -33,9 +33,10 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const running = useRef(false);
-  const key = selection === null ? workspaces[0]?.key : selection;
-  const selected = workspaces.find(workspace => workspace.key === key);
-  const timeline = filterActivity(recentActivity(events, selected?.path, selected?.sessionIds), providerFilter, eventFilter);
+  const selectedFilter = workspaces.find(workspace => workspace.key === selection);
+  const selected = workspaces.find(workspace => workspace.key === checkSelection);
+  const timeline = filterActivity(recentActivity(events, selectedFilter?.path, selectedFilter?.sessionIds), providerFilter, eventFilter);
+  const activeFilters = Number(Boolean(selectedFilter)) + Number(providerFilter !== 'all') + Number(eventFilter !== 'all');
   const proof = selected ? checks[selected.key] ?? selected.proof : null;
   const summary = checkSummary(proof);
   const authorized = Boolean(selected && approvedWorkspaces.some(path => workspaceIdentity(path) === selected.key));
@@ -58,18 +59,14 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
   };
 
   return <div className="section-scroll activity-simple" aria-label="Activity history and workspace checks">
-    {workspaces.length > 0 && <div className="activity-workspace-picker">
-      <label htmlFor="activity-workspace">Workspace</label>
-      <select id="activity-workspace" value={selected?.key ?? ''} onChange={event => {
-        setSelection(event.target.value); setVisibleCount(6);
-      }}>
-        <option value="">All activity</option>
-        {workspaces.map(workspace => <option key={workspace.key} value={workspace.key}>{workspaces.filter(other => other.label === workspace.label).length > 1 ? workspace.path : workspace.label}</option>)}
-      </select>
-      {selected && <p className="activity-path" title={selected.path}>{selected.path}</p>}
-    </div>}
-
+    <div className="activity-header"><div><h2>Recent activity</h2><p>What your agents have reported</p></div>
+      <button type="button" className="inline-action activity-filter-toggle" aria-expanded={filtersOpen} aria-controls="activity-filters" onClick={() => setFiltersOpen(open => !open)}>Filters{activeFilters > 0 ? ` (${activeFilters})` : ''}</button>
+    </div>
+    {filtersOpen && <div id="activity-filters" className="activity-filter-panel">
     <div className="activity-filters">
+      <label>Project<select value={selectedFilter?.key ?? ''} onChange={event => { setSelection(event.target.value); setVisibleCount(6); }}>
+        <option value="">All projects</option>{workspaces.map(workspace => <option key={workspace.key} value={workspace.key}>{workspaces.filter(other => other.label === workspace.label).length > 1 ? workspace.path : workspace.label}</option>)}
+      </select></label>
       <label>Provider<select value={providerFilter} onChange={event => { setProviderFilter(event.target.value); setVisibleCount(6); }}>
         <option value="all">All providers</option>{Object.entries(PROVIDER_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
       </select></label>
@@ -77,27 +74,32 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
         <option value="all">All events</option><option value="attention">Needs attention</option><option value="PermissionRequest">Approval requests</option><option value="Error">Errors</option>
       </select></label>
     </div>
-    {(providerFilter !== 'all' || eventFilter !== 'all') && <button type="button" className="inline-action subtle-action clear-filters" onClick={() => { setProviderFilter('all'); setEventFilter('all'); setVisibleCount(6); }}>Clear filters</button>}
-    <div className="section-heading first-heading"><h2>Recent activity</h2><span className="subtle-label tabular">{timeline.length} events</span></div>
+    {activeFilters > 0 && <button type="button" className="inline-action subtle-action clear-filters" onClick={() => { setSelection(''); setProviderFilter('all'); setEventFilter('all'); setVisibleCount(6); }}>Clear filters</button>}
+    </div>}
     {timeline.length > 0 ? <>
       <ol className="activity-timeline" aria-label="Recent activity, newest first">
         {timeline.slice(0, visibleCount).map((event, index) => <li key={`${event.source}:${event.session_id}:${event.timestamp}:${event.event}:${index}`}>
-          <span className={`activity-event-mark ${event.event === 'PermissionRequest' || event.event === 'Error' ? 'needs-attention' : ''}`} aria-hidden="true" />
           <ProviderIcon provider={event.source in PROVIDER_NAMES ? event.source as Provider : 'other'} />
-          <div><strong>{activityLabel(event)}</strong><span>{PROVIDER_NAMES[event.source as Provider] ?? 'Agent'}{!selected && event.cwd ? ` · ${workspaces.find(w => w.key === workspaceIdentity(event.cwd!))?.label ?? 'Workspace'}` : ''}</span></div>
+          <div><strong>{activityLabel(event)}</strong><span>{PROVIDER_NAMES[event.source as Provider] ?? 'Agent'} · {event.cwd ? workspaces.find(w => w.key === workspaceIdentity(event.cwd!))?.label ?? 'Project unavailable' : 'Project unavailable'}</span>{(event.event === 'PermissionRequest' || event.event === 'Error') && <span className="activity-attention">Needs attention</span>}</div>
           <time dateTime={event.timestamp}>{demo ? 'Sample' : relativeTime(event.timestamp)}</time>
         </li>)}
       </ol>
       {timeline.length > visibleCount && <button type="button" className="inline-action subtle-action" onClick={() => setVisibleCount(count => count + 6)}>Show earlier activity</button>}
     </> : <div className="overview-empty">
-      <Activity size={24} aria-hidden="true" /><strong>No activity yet</strong>
-      <p>{providerFilter !== 'all' || eventFilter !== 'all' ? 'No events match these filters. Try another provider or event.' : selected ? 'New actions from this workspace will appear here.' : 'Start a coding task to see what your agent is doing.'}</p>
+      <Activity size={24} aria-hidden="true" /><strong>{activeFilters ? 'No matching activity' : 'No activity yet'}</strong>
+      <p>{activeFilters ? 'Try changing or clearing your filters.' : 'Start a coding task to see what your agent is doing.'}</p>
     </div>}
 
-    {selected ? <details className="activity-checks" key={selected.key}>
+    <details className="activity-checks">
       <summary>Files &amp; tests <span>Optional checks</span></summary>
       <div className="activity-check-content">
-        <p>Check this workspace when you want to review file changes or confirm test results.</p>
+        <p>Choose a project to optionally check changed files or run tests.</p>
+        <div className="activity-workspace-picker"><label htmlFor="activity-check-workspace">Project to check</label>
+          <select id="activity-check-workspace" value={selected?.key ?? ''} onChange={event => setCheckSelection(event.target.value)}>
+            <option value="">Choose a project</option>{workspaces.map(workspace => <option key={workspace.key} value={workspace.key}>{workspaces.filter(other => other.label === workspace.label).length > 1 ? workspace.path : workspace.label}</option>)}
+          </select>{selected && <p className="activity-path" title={selected.path}>{selected.path}</p>}
+        </div>
+        {!selected ? <p>{workspaces.length ? 'Choose a project to see available checks.' : 'Projects appear here after an agent reports activity.'}</p> : <>
         {demo ? <p>Sample results. Switch off simulation to run real checks.</p> : !isDesktop() ? <p>Open the desktop app to run checks.</p> : !authorized ? <div className="activity-access">
           <p>Authorize this folder in Settings before checking files or running tests.</p>
           <button type="button" className="inline-action" onClick={() => onWorkspaceSettings(selected.path)}>Set up workspace</button>
@@ -118,7 +120,8 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
           <button type="button" className="inline-action" disabled={!canCheck || !profile} onClick={() => void run(true)}>{busy?.key === selected.key && busy.tests ? 'Running tests…' : 'Run tests'}</button>
         </div>
         {errors[selected.key] && <p className="activity-check-error" role="alert">{errors[selected.key]}</p>}
+        </>}
       </div>
-    </details> : workspaces.length > 0 ? <p className="activity-check-hint">Choose a workspace above to review its files and tests.</p> : null}
+    </details>
   </div>;
 });

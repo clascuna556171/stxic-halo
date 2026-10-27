@@ -6,8 +6,8 @@ import { relativeTime } from '../lib/format';
 import { ProviderIcon } from './ProviderIcon';
 import type { Agent, ClaudeHookStatus, ProviderConnection } from '../types';
 
-export function ConnectionHealth({ agents, claudeHookStatus, codexLogsEnabled, onConnect }: {
-  agents: Agent[]; claudeHookStatus?: ClaudeHookStatus | null; codexLogsEnabled: boolean; onConnect: () => void;
+export function ConnectionHealth({ agents, claudeHookStatus, codexLogsEnabled }: {
+  agents: Agent[]; claudeHookStatus?: ClaudeHookStatus | null; codexLogsEnabled: boolean;
 }) {
   const [connections, setConnections] = useState<ProviderConnection[] | null>(null);
   useEffect(() => {
@@ -27,6 +27,5 @@ export function ConnectionHealth({ agents, claudeHookStatus, codexLogsEnabled, o
         <span>{status}{recent ? ` · Last activity ${relativeTime(recent.lastSeen)}` : ' · No activity observed'}</span>
       </div>;
     })}
-    <button type="button" className="inline-action" onClick={onConnect}>Manage connections</button>
   </details>;
 }

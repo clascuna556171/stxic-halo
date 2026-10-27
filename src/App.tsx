@@ -20,7 +20,8 @@ import { ProviderConnections } from './components/ProviderConnections';
 import { ProviderIcon } from './components/ProviderIcon';
 import { ClaudeStatuslineSetup } from './components/ClaudeStatuslineSetup';
 import { DataControls } from './components/DataControls';
-import { useQuotaNotifications } from './components/QuotaNotifications';
+import { useQuotaNotifications, QuotaNotificationSettings } from './components/QuotaNotifications';
+import { ConnectionHealth } from './components/ConnectionHealth';
 import { ActivityView } from './components/ActivityView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useHaloRuntime } from './hooks/useHaloRuntime';
@@ -30,6 +31,7 @@ import { contextBudget, currentSessions, providerName } from './lib/sessionSumma
 import { relativeTime } from './lib/format';
 import { isDesktop } from './lib/desktop';
 import type {
+  Agent,
   ClaudeHookStatus,
   DiagnosticBundleExport,
   LaunchAtLoginStatus,
@@ -74,6 +76,7 @@ const SettingsView = memo(function SettingsView({
   exportResult,
   exportError,
   suggestedWorkspace,
+  agents,
 }: {
   demo: boolean;
   setDemo: (value: boolean) => void;
@@ -97,6 +100,7 @@ const SettingsView = memo(function SettingsView({
   exportResult?: DiagnosticBundleExport | null;
   exportError?: string | null;
   suggestedWorkspace?: string;
+  agents: Agent[];
 }) {
   const [workspaceInput, setWorkspaceInput] = useState(suggestedWorkspace ?? '');
   const [workspaceError, setWorkspaceError] = useState('');
@@ -251,6 +255,8 @@ const SettingsView = memo(function SettingsView({
         </div>
       </div>
 
+      <div className="settings-card notification-preferences"><QuotaNotificationSettings /></div>
+      <div className="settings-card health-preferences"><ConnectionHealth agents={agents} claudeHookStatus={claudeHookStatus} codexLogsEnabled={settings.enable_codex_logs !== false} /></div>
       <ClaudeStatuslineSetup />
       <DataControls />
       <div className="section-heading"><h2>More coding agents</h2><span className="subtle-label">Opt-in connections</span></div>
@@ -796,7 +802,6 @@ export default function App() {
                 {permissions.notice && <p className="permission-message" role="status">{permissions.notice}</p>}
                 {tab === 'overview' && (
                   <Overview
-                    codexLogsEnabled={settings.enable_codex_logs !== false}
                     usageResult={usageResult}
                     agents={shownAgents}
                     alerts={activeAlerts.filter(alert => alert.agent.id !== pendingPermission?.session_id)}
@@ -830,6 +835,7 @@ export default function App() {
                 )}
                 {tab === 'settings' && (
                   <SettingsView
+                    agents={shownAgents}
                     suggestedWorkspace={workspaceSetup}
                     demo={demo}
                     setDemo={setDemo}

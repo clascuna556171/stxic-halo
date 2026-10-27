@@ -12,8 +12,10 @@ describe('usage panel', () => {
   it('renders reported quota, reset, true zero usage and cost with separate headings', () => {
     const html = renderToStaticMarkup(<UsageOverview agents={[]} result={result} />);
     expect(html).toContain('80% left');
+    expect(html).toContain('0 tokens · latest session');
     expect(html).toContain('Resets ');
     expect(html).toContain('<meter');
+    expect(html).toContain('value="80"');
     expect(html).toContain('>0</dd>');
     expect(html).toContain('$0.00');
     expect(html).toContain('Subscription quota');
@@ -30,14 +32,16 @@ describe('usage panel', () => {
     expect(html).not.toContain('<meter');
     expect(html).not.toContain('80% left');
   });
-  it('shows all five providers together without a selector or hidden provider sections', () => {
+  it('shows five compact provider rows with details available on demand', () => {
     const html = renderToStaticMarkup(<UsageOverview agents={[]} result={{ reports: [], errors: [] }} />);
     for (const provider of ['Codex', 'Claude', 'Antigravity', 'GitHub Copilot', 'OpenCode']) {
       expect(html).toContain(`aria-label="${provider} usage"`);
-      expect(html).toContain(`<h3>${provider}</h3>`);
+      expect(html).toContain(`<strong>${provider}</strong>`);
     }
     expect(html).not.toContain('<select');
-    expect(html).not.toContain('<details class="usage-provider');
+    expect(html).toContain('<details class="usage-provider-details');
+    expect(html).toContain('Limit not available');
+    expect(html).toContain('Tokens not available');
     expect(html).toContain('Connect OpenCode in Settings');
     expect(html).toContain('Claude quota can be supplied by the optional status line');
     expect(html).toContain('Check /usage in Antigravity');

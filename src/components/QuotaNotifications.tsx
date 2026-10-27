@@ -48,8 +48,10 @@ export function useQuotaNotifications(agents: Agent[], result: UsageReadResult, 
 export function QuotaNotificationSettings() {
   const [prefs, setPrefs] = useState(readPreferences);
   const [message, setMessage] = useState('');
+  const [inApp, setInApp] = useState(() => { try { return localStorage.getItem('stxic.halo.quotaAlerts') === 'true'; } catch { return false; } });
   const change = (next: Preferences) => { setPrefs(next); save(next); };
   return <details className="notification-settings"><summary>Desktop quota notifications</summary>
+    <label><input type="checkbox" checked={inApp} onChange={event => { setInApp(event.target.checked); try { localStorage.setItem('stxic.halo.quotaAlerts', String(event.target.checked)); } catch { /* Session only. */ } }} /> Show low-quota warnings in Overview</label>
     <p>Optional alerts for fresh readings at 20% or less. One alert per reported reset window; readings without a reset time stay in Halo.</p>
     <label><input type="checkbox" checked={prefs.enabled} disabled={!isDesktop()} onChange={event => {
       if (!event.target.checked) { change({ ...prefs, enabled: false }); return; }

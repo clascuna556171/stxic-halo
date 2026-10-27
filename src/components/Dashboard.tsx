@@ -2,7 +2,6 @@ import { memo } from 'react';
 import {
   AlertTriangle,
   ArrowUpRight,
-  Bot,
   Check,
   Cpu,
   HardDrive,
@@ -23,7 +22,6 @@ import { gib, percent, relativeTime } from '../lib/format';
 import { contextBudget, currentSessions, PROVIDER_NAMES } from '../lib/sessionSummary';
 import { UsageOverview } from './UsageOverview';
 import { ProviderIcon } from './ProviderIcon';
-import { ConnectionHealth } from './ConnectionHealth';
 import type { UsageReadResult } from '../types';
 
 const statusLabel: Record<Agent['status'], string> = {
@@ -85,7 +83,7 @@ export const AttentionCard = memo(function AttentionCard({
 });
 
 export const Overview = memo(function Overview({
-  agents, alerts, onReview, onAcknowledgeAlert, onConnect, claudeHookStatus, usageResult, codexLogsEnabled,
+  agents, alerts, onReview, onAcknowledgeAlert, onConnect, claudeHookStatus, usageResult,
 }: {
   agents: Agent[];
   alerts: AlertItem[];
@@ -94,13 +92,13 @@ export const Overview = memo(function Overview({
   onConnect: () => void;
   claudeHookStatus?: ClaudeHookStatus | null;
   usageResult: UsageReadResult;
-  codexLogsEnabled: boolean;
 }) {
   const sessions = currentSessions(agents);
   return (
     <div className="section-scroll overview-simple" aria-label="Workspace overview">
       {alerts[0] && <AttentionCard alert={alerts[0]} onReview={onReview} onAcknowledge={onAcknowledgeAlert} />}
-      <div className="section-heading first-heading">
+      <UsageOverview agents={agents} result={usageResult} />
+      <div className="section-heading session-heading">
         <h2>Current sessions</h2>
         <span className="subtle-label tabular">{sessions.length} active</span>
       </div>
@@ -117,15 +115,12 @@ export const Overview = memo(function Overview({
             <span>{relativeTime(agent.lastSeen)}</span>
           </span>
         </button>;
-      }) : <div className="overview-empty">
-        <Bot size={24} aria-hidden="true" />
-        <strong>No agents working right now</strong>
-        <p>Start a coding task and its progress will appear here.</p>
+      }) : <div className="overview-empty session-empty">
+        <strong>No active sessions</strong>
         {!agents.length && !claudeHookStatus?.installed && <button type="button" className="inline-action" onClick={onConnect}>Manage connections</button>}
         {agents.length > 0 && <button type="button" className="inline-action subtle-action" onClick={onReview}>View recent activity</button>}
       </div>}
-      <ConnectionHealth agents={agents} claudeHookStatus={claudeHookStatus} codexLogsEnabled={codexLogsEnabled} onConnect={onConnect} />
-      <UsageOverview agents={agents} result={usageResult} />
+
     </div>
   );
 });

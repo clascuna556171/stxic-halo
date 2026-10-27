@@ -13,3 +13,5 @@ src-tauri/gen/schemas/
 *.p12
 *.pem
 *.key
+
+release-output/
