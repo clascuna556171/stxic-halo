@@ -53,12 +53,145 @@ import type {
   PollTimingSummary,
   ProofSummary,
   ProcessLifecycleSnapshot,
+  QuotaWindow,
   Tab,
   UserSettings,
   UsageReadResult,
 } from '../types';
 
 const TAB_ORDER: readonly Tab[] = ['overview', 'activity', 'system', 'settings'];
+
+export function areMetricsEqual(a: Metrics | null, b: Metrics | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    Math.abs(a.cpu_percent - b.cpu_percent) < 0.2 &&
+    a.memory_used_bytes === b.memory_used_bytes &&
+    a.memory_total_bytes === b.memory_total_bytes &&
+    a.process_count === b.process_count
+  );
+}
+
+export function areProcessLifecyclesEqual(
+  a: ProcessLifecycleSnapshot | null,
+  b: ProcessLifecycleSnapshot | null
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (
+    a.available !== b.available ||
+    a.claude_processes !== b.claude_processes ||
+    a.codex_processes !== b.codex_processes ||
+    a.processes.length !== b.processes.length
+  ) {
+    return false;
+  }
+  for (let i = 0; i < a.processes.length; i++) {
+    const pa = a.processes[i];
+    const pb = b.processes[i];
+    if (pa.pid !== pb.pid || pa.provider !== pb.provider || pa.cwd !== pb.cwd) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function areEventsEqual(a: AgentEvent[], b: AgentEvent[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  if (a.length === 0) return true;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.session_id !== y.session_id ||
+      x.timestamp !== y.timestamp ||
+      x.event !== y.event ||
+      x.source !== y.source ||
+      x.cwd !== y.cwd ||
+      x.tool_name !== y.tool_name ||
+      x.schema_version !== y.schema_version
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function areProofsEqual(a: ProofSummary | null | undefined, b: ProofSummary | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.verified === b.verified &&
+    a.testsPassed === b.testsPassed &&
+    a.tests_passed === b.tests_passed &&
+    a.testsFailed === b.testsFailed &&
+    a.tests_failed === b.tests_failed &&
+    a.changedFiles === b.changedFiles &&
+    a.changed_files === b.changed_files &&
+    a.provenance === b.provenance &&
+    a.evidence_timestamp === b.evidence_timestamp &&
+    a.evidenceTimestamp === b.evidenceTimestamp
+  );
+}
+
+function areQuotasEqual(a?: QuotaWindow[], b?: QuotaWindow[]): boolean {
+  if (a === b) return true;
+  if (!a || !b) return !a && !b;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const qa = a[i];
+    const qb = b[i];
+    if (
+      qa.label !== qb.label ||
+      qa.used_percent !== qb.used_percent ||
+      qa.resets_at !== qb.resets_at ||
+      qa.observed_at !== qb.observed_at ||
+      qa.window_minutes !== qb.window_minutes
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function areAgentsEqual(a: Agent[], b: Agent[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.provider !== y.provider ||
+      x.name !== y.name ||
+      x.task !== y.task ||
+      x.workspace !== y.workspace ||
+      x.workspacePath !== y.workspacePath ||
+      x.status !== y.status ||
+      x.lastSeen !== y.lastSeen ||
+      x.tokenUsage !== y.tokenUsage ||
+      x.contextTokens !== y.contextTokens ||
+      x.contextPercent !== y.contextPercent ||
+      x.contextWindow !== y.contextWindow ||
+      x.usageObservedAt !== y.usageObservedAt ||
+      x.isStale !== y.isStale ||
+      x.isDemo !== y.isDemo ||
+      x.liveness !== y.liveness ||
+      !areProofsEqual(x.proof, y.proof) ||
+      !areQuotasEqual(x.quotaWindows, y.quotaWindows)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function areUsageResultsEqual(a: UsageReadResult, b: UsageReadResult): boolean {
+  if (a === b) return true;
+  if (a.reports.length !== b.reports.length || a.errors.length !== b.errors.length) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 export function useHaloRuntime() {
   const [expanded, setExpanded] = useState(false);
@@ -89,6 +222,23 @@ export function useHaloRuntime() {
 
   const processLifecycleRef = useRef(processLifecycle);
   processLifecycleRef.current = processLifecycle;
+
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+
+  const agentsRef = useRef(agents);
+  agentsRef.current = agents;
+
+  // Background telemetry refs are updated by polling and never overwritten by render passes
+  const metricsRef = useRef<Metrics | null>(metrics);
+  const metricsHistoryRef = useRef<MetricsHistorySummary>(metricsHistory);
+  const pollTimingsRef = useRef<number[]>(pollTimings);
+
+  const usageResultRef = useRef(usageResult);
+  usageResultRef.current = usageResult;
+
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
 
   const refreshClaudeHookStatus = useCallback(async () => {
     try {
@@ -226,21 +376,9 @@ export function useHaloRuntime() {
   useEffect(() => {
     if (demo || !isDesktop()) return;
     let cleanup: (() => void) | undefined;
-    void subscribeEventsUpdated((newEvents) => {
-      setEvents((prev) => {
-        const codexEvents = prev.filter((e) => e.source === 'codex');
-        return [...newEvents, ...codexEvents];
-      });
-      const claudeAgents = sessionsFromEvents(newEvents.filter(e => e.source !== 'codex'), {
-        staleMinutes: settingsRef.current.stale_minutes,
-      });
-      setAgents((prev) => {
-        const codexAgents = prev.filter((a) => a.provider === 'codex');
-        const raw = [...claudeAgents, ...codexAgents];
-        return applyWorkspaceChecks(reconcileSessions(raw, processLifecycleRef.current, {
-          enabled: settingsRef.current.process_reconciliation !== false,
-        }), workspaceChecksRef.current);
-      });
+    void subscribeEventsUpdated(() => {
+      // Immediate poll pass when events file changes on disk
+      void pollNow();
     }).then((unlisten) => {
       cleanup = unlisten;
     });
@@ -306,80 +444,67 @@ export function useHaloRuntime() {
     }
   }, [settings.approved_workspaces]);
 
-  // Background polling with single-flight lock and visibility pause.
-  const pollNow = useCallback(async () => {
+  // Core polling execution engine with content-equality guards to eliminate state thrashing
+  const executePoll = useCallback(async (tickCount = 0) => {
     if (demo || !isDesktop()) return;
     try {
       const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const isExpanded = expandedRef.current;
+      const currentTab = tabRef.current;
+      const isSystemTabActive = isExpanded && currentTab === 'system';
+
+      // Throttling sysinfo sampling when collapsed and idle to avoid waking the CPU to measure the CPU
+      const shouldSampleMetrics = isSystemTabActive || metricsRef.current === null || tickCount % 4 === 0;
+
       const [nextMetrics, nextEvents, codexEvents, codexTelemetry, processSnapshot, usage] = await Promise.all([
-        readMetrics(),
+        shouldSampleMetrics ? readMetrics() : Promise.resolve(metricsRef.current),
         readEvents(),
         settingsRef.current.enable_codex_logs !== false ? readCodexEvents() : Promise.resolve([]),
         settingsRef.current.enable_codex_logs !== false ? readCodexTelemetry() : Promise.resolve([]),
         readProcessLifecycle(),
         readUsageReports(),
       ]);
+
       const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-      setPollTimings((prev) => appendPollTiming(prev, elapsed));
-
-      const combinedEvents = [...nextEvents, ...codexEvents];
-      setMetrics(nextMetrics);
-      setMetricsHistory((prev) => appendMetricsSample(prev, nextMetrics));
-      setEvents(combinedEvents);
-      setUsageResult(usage);
-
-      const claudeAgents = sessionsFromEvents(nextEvents.filter(e => e.source !== 'codex'), {
-        staleMinutes: settingsRef.current.stale_minutes,
-      });
-      const codexAgents = reduceCodexSessions(codexEvents, {
-        staleMinutes: settingsRef.current.stale_minutes,
-        telemetry: codexTelemetry,
-      });
-      const raw = [...claudeAgents, ...codexAgents];
-      const reconciled = reconcileSessions(raw, processSnapshot, {
-        enabled: settingsRef.current.process_reconciliation !== false,
-      });
-      setAgents(applyWorkspaceChecks(reconciled, workspaceChecksRef.current));
-      setProcessLifecycle(processSnapshot);
-      setLiveError(null);
-    } catch (error) {
-      setLiveError(error instanceof Error ? error.message : String(error));
-    }
-  }, [demo]);
-
-  useEffect(() => {
-    if (demo || !isDesktop()) return;
-    let disposed = false;
-    let inFlight = false;
-    let tickCount = 0;
-
-    const tick = async () => {
-      if (disposed || inFlight) return;
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        return;
+      pollTimingsRef.current = appendPollTiming(pollTimingsRef.current, elapsed);
+      if (isSystemTabActive) {
+        setPollTimings([...pollTimingsRef.current]);
       }
-      inFlight = true;
-      try {
-        const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        const [nextMetrics, nextEvents, codexEvents, codexTelemetry, processSnapshot, usage] = await Promise.all([
-          readMetrics(),
-          readEvents(),
-          settingsRef.current.enable_codex_logs !== false ? readCodexEvents() : Promise.resolve([]),
-          settingsRef.current.enable_codex_logs !== false ? readCodexTelemetry() : Promise.resolve([]),
-          readProcessLifecycle(),
-          readUsageReports(),
-        ]);
-        const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
-        setPollTimings((prev) => appendPollTiming(prev, elapsed));
 
-        if (disposed) return;
-        const combinedEvents = [...nextEvents, ...codexEvents];
-        setMetrics(nextMetrics);
-        setMetricsHistory((prev) => appendMetricsSample(prev, nextMetrics));
+      // Update metrics & metricsHistory
+      if (nextMetrics) {
+        metricsRef.current = nextMetrics;
+        metricsHistoryRef.current = appendMetricsSample(metricsHistoryRef.current, nextMetrics);
+        if (isSystemTabActive) {
+          setMetrics(nextMetrics);
+          setMetricsHistory(metricsHistoryRef.current);
+        }
+      }
+
+      // Guard events update
+      const combinedEvents = [...nextEvents, ...codexEvents];
+      const eventsChanged = !areEventsEqual(eventsRef.current, combinedEvents);
+      if (eventsChanged) {
+        eventsRef.current = combinedEvents;
         setEvents(combinedEvents);
-        setUsageResult(usage);
+      }
 
-        const claudeAgents = sessionsFromEvents(nextEvents.filter(e => e.source !== 'codex'), {
+      // Guard usage update
+      if (!areUsageResultsEqual(usageResultRef.current, usage)) {
+        usageResultRef.current = usage;
+        setUsageResult(usage);
+      }
+
+      // Guard process lifecycle update
+      const lifecycleChanged = !areProcessLifecyclesEqual(processLifecycleRef.current, processSnapshot);
+      if (lifecycleChanged) {
+        processLifecycleRef.current = processSnapshot;
+        setProcessLifecycle(processSnapshot);
+      }
+
+      // Guard agents update: only rebuild and reconcile sessions if events or lifecycle changed, or if list is empty
+      if (eventsChanged || lifecycleChanged || agentsRef.current.length === 0) {
+        const claudeAgents = sessionsFromEvents(nextEvents.filter((e) => e.source !== 'codex'), {
           staleMinutes: settingsRef.current.stale_minutes,
         });
         const codexAgents = reduceCodexSessions(codexEvents, {
@@ -390,12 +515,80 @@ export function useHaloRuntime() {
         const reconciled = reconcileSessions(raw, processSnapshot, {
           enabled: settingsRef.current.process_reconciliation !== false,
         });
-        setAgents(applyWorkspaceChecks(reconciled, workspaceChecksRef.current));
-        setProcessLifecycle(processSnapshot);
-        setLiveError(null);
+        const nextAgents = applyWorkspaceChecks(reconciled, workspaceChecksRef.current);
+        if (!areAgentsEqual(agentsRef.current, nextAgents)) {
+          agentsRef.current = nextAgents;
+          setAgents(nextAgents);
+        }
+      }
 
-        // Every 12 ticks (~30s at 2.5s poll), refresh integration status and performance stats
+      setLiveError(null);
+    } catch (error) {
+      setLiveError(error instanceof Error ? error.message : String(error));
+    }
+  }, [demo]);
+
+  const pollNow = useCallback(async () => {
+    await executePoll(0);
+  }, [executePoll]);
+
+  // Synchronize system tab metrics and timings on-demand when user opens System tab
+  useEffect(() => {
+    if (expanded && tab === 'system') {
+      if (metricsRef.current && !areMetricsEqual(metrics, metricsRef.current)) {
+        setMetrics(metricsRef.current);
+      }
+      setMetricsHistory(metricsHistoryRef.current);
+      setPollTimings([...pollTimingsRef.current]);
+    }
+  }, [expanded, tab, metrics]);
+
+  // When expanding or previewing, trigger an immediate fast refresh
+  useEffect(() => {
+    if (expanded || preview) {
+      void pollNow();
+    }
+  }, [expanded, preview, pollNow]);
+
+  // Adaptive background polling timer: throttles cadence when collapsed and idle
+  useEffect(() => {
+    if (demo || !isDesktop()) return;
+    let disposed = false;
+    let inFlight = false;
+    let tickCount = 0;
+    let timerId: number | undefined;
+
+    const scheduleNext = () => {
+      if (disposed) return;
+      const isExpanded = expandedRef.current || previewRef.current;
+      const hasActiveProcesses =
+        (processLifecycleRef.current?.claude_processes ?? 0) > 0 ||
+        (processLifecycleRef.current?.codex_processes ?? 0) > 0;
+      const hasWorkingAgents = agentsRef.current.some((a) => a.status === 'working');
+
+      const activeRate = Math.max(1000, Math.min(15000, settingsRef.current.poll_interval_ms));
+      // In idle collapsed state, conserve CPU and disk I/O with an eco cadence (~6s)
+      const ecoRate = Math.max(5000, Math.min(15000, activeRate * 2.5));
+      const nextInterval = isExpanded || hasActiveProcesses || hasWorkingAgents ? activeRate : ecoRate;
+
+      timerId = window.setTimeout(() => {
+        void tick();
+      }, nextInterval);
+    };
+
+    const tick = async () => {
+      if (disposed || inFlight) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        scheduleNext();
+        return;
+      }
+      inFlight = true;
+      try {
         tickCount++;
+        await executePoll(tickCount);
+        if (disposed) return;
+
+        // Every 12 ticks (~30s-60s), refresh integration status and performance stats
         if (tickCount % 12 === 0) {
           void refreshIntegrationStatus();
           void refreshPerfStats();
@@ -406,28 +599,19 @@ export function useHaloRuntime() {
         }
       } finally {
         inFlight = false;
+        scheduleNext();
       }
     };
 
     void tick();
-    const intervalMs = Math.max(1000, Math.min(15000, settings.poll_interval_ms));
-    const timer = window.setInterval(() => {
-      void tick();
-    }, intervalMs);
 
     return () => {
       disposed = true;
-      window.clearInterval(timer);
+      if (timerId !== undefined) {
+        window.clearTimeout(timerId);
+      }
     };
-  }, [
-    demo,
-    settings.poll_interval_ms,
-    settings.stale_minutes,
-    settings.enable_codex_logs,
-    settings.process_reconciliation,
-    refreshIntegrationStatus,
-    refreshPerfStats,
-  ]);
+  }, [demo, executePoll, refreshIntegrationStatus, refreshPerfStats]);
 
   const updateSettings = useCallback(
     (patch: Partial<UserSettings>) => {

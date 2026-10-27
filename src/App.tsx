@@ -591,11 +591,11 @@ export default function App() {
     wasExpandedRef.current = expanded;
   }, [expanded]);
 
-  const sessions = currentSessions(shownAgents);
-  const activeWorking = sessions.filter((a) => a.status === 'working').length;
+  const sessions = useMemo(() => currentSessions(shownAgents), [shownAgents]);
+  const activeWorking = useMemo(() => sessions.filter((a) => a.status === 'working').length, [sessions]);
   const leadWorkingAgent = sessions[0];
-  const previewAgent = leadWorkingAgent ?? [...shownAgents].sort((a, b) => Date.parse(b.lastSeen) - Date.parse(a.lastSeen))[0];
-  const budget = contextBudget(previewAgent);
+  const previewAgent = useMemo(() => leadWorkingAgent ?? [...shownAgents].sort((a, b) => Date.parse(b.lastSeen) - Date.parse(a.lastSeen))[0], [leadWorkingAgent, shownAgents]);
+  const budget = useMemo(() => contextBudget(previewAgent), [previewAgent]);
   const leadAlert = activeAlerts[0];
   const leadAttention = leadAlert?.agent;
   const failedCount = leadAttention?.proof?.testsFailed ?? 0;
