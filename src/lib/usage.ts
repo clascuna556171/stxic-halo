@@ -40,7 +40,7 @@ export function providerUsage(provider: Provider, agents: readonly Agent[], repo
     const source = report.source === 'session-log' ? 'Session log' : report.source === 'plugin' ? 'Local plugin'
       : report.source === 'statusline' ? 'Claude status line' : provider === 'opencode' ? 'Local plugin/export' : 'Local export';
     report.sessions.forEach(s => addSession(s, source));
-    report.quotas.forEach(q => addQuota(q, 'Local export'));
+    report.quotas.forEach(q => addQuota(q, source));
   }
   for (const agent of agents.filter(a => a.provider === provider)) {
     if (agent.tokenUsage !== null) addSession({ session_id: agent.id, total_tokens: agent.tokenUsage,

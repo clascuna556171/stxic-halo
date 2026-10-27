@@ -117,7 +117,31 @@ pub fn read_usage_reports(settings: State<'_, Mutex<UserSettings>>) -> Result<Us
             Err(error) => result.errors.push(error),
         }
     }
+    let status_dir = root.join("claude-statusline");
+    let mut status_files: Vec<_> = std::fs::read_dir(status_dir).into_iter().flatten()
+        .filter_map(Result::ok).take(64)
+        .filter(|entry| entry.path().extension().and_then(|e| e.to_str()) == Some("json"))
+        .collect();
+    status_files.sort_by_key(|entry| std::cmp::Reverse(entry.metadata().and_then(|m| m.modified()).ok()));
+    for entry in status_files.into_iter().take(16) {
+        match read_report(&entry.path(), "claude-code") {
+            Ok(Some(mut report)) => { report.source = Some(UsageSource::Statusline); result.reports.push(report); },
+            Ok(None) => {},
+            Err(error) => result.errors.push(error),
+        }
+    }
     Ok(result)
+}
+
+/// Only prepares Halo's script. The user chooses whether and how to configure Claude Code.
+#[tauri::command]
+pub fn prepare_claude_statusline() -> Result<String, String> {
+    let root = crate::paths::ensure_app_data_dir()?.join("integrations");
+    std::fs::create_dir_all(&root).map_err(|_| "Cannot create integrations directory")?;
+    let script = root.join("claude-statusline.ps1");
+    std::fs::write(&script, include_str!("../../scripts/claude-statusline.ps1"))
+        .map_err(|_| "Cannot write Halo status-line script")?;
+    Ok(format!("powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{}\"", script.display()))
 }
 
 #[cfg(test)]

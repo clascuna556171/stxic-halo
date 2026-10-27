@@ -1,5 +1,14 @@
 # Halo feature plan
 
+## Implementation checkpoint — 2026-10-28
+
+- Claude quota: a manually configured status-line capture is available in Settings. It prepares a Halo-owned script and does not modify existing Claude configuration. Real Claude Code compatibility remains to be tested.
+- Data: Settings describes local sources and offers an explicit preview and cleanup of aged Halo-generated session snapshots and the rotated activity backup. It does not provide automatic retention or delete provider-owned data.
+- Activity: provider and event filters persist locally and can be cleared.
+- Notifications: optional per-provider desktop alerts with fixed quiet hours, deduplication by reset window, and fresh quota requirements are implemented. Real Windows delivery and packaged Store behavior remain to be tested.
+- Codex: version `0.164.0-alpha.11.1` was observed on the development machine. App-server authentication remains unimplemented because the owner intends to distribute to friends and potentially the Microsoft Store; distribution and authentication eligibility must be confirmed with OpenAI first. Listing in a store does not establish provider permission.
+- Interface: overview and settings styling refined; browser preview checked. Native window and accessibility verification remain outstanding.
+
 This plan prioritizes useful, transparent monitoring using documented integrations. Availability and provider terms must be rechecked before each integration ships. Halo must not reuse provider OAuth credentials, impersonate clients, scrape undocumented endpoints, or bypass limits.
 
 ## 1. Claude Code quota through its documented status line

@@ -1746,3 +1746,31 @@ html:has(.floating-close) {
 .quota-alert-toggle input { margin-top: 2px; }
 .quota-warnings { padding: 8px 10px; border: 1px solid var(--indicator-warning); border-radius: 8px; font-size: 11px; line-height: 1.5; }
 .quota-warnings p + p { margin-top: 8px; }
+/* Calm, legible controls for the compact dashboard. */
+.expanded-card { background: rgba(16, 17, 21, .96); border-color: rgba(255,255,255,.13); }
+.island-header { border-bottom-color: rgba(255,255,255,.08); }
+.section-heading h2 { font-size: 12px; letter-spacing: .005em; }
+.session-row { border-radius: 10px; padding: 12px 10px; }
+.session-row:hover { background: rgba(255,255,255,.055); }
+.provider-icon { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.1); }
+.usage-provider { margin-top: 10px; padding: 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; background: rgba(255,255,255,.025); }
+.usage-provider-heading h3 { font-size: 13px; }
+.usage-provider-heading > span, .usage-session dt, .usage-overview small { font-size: 11px; }
+.usage-overview h4 { color: var(--vibrancy-secondary); margin-top: 14px; }
+.usage-unavailable, .usage-footnote, .usage-quota p { font-size: 11.5px; }
+.quota-alert-toggle { padding: 10px 0; font-size: 12px; align-items: center; }
+.quota-alert-toggle input, .notification-settings input { accent-color: var(--indicator-accent); }
+.notification-settings, .connection-health { padding: 12px 0; border-top: 1px solid var(--stroke); }
+.notification-settings summary, .statusline-setup summary, .data-controls summary { font-size: 12px; font-weight: 600; cursor: pointer; }
+.notification-settings p, .statusline-setup p, .data-controls p { color: var(--text-dim); font-size: 11.5px; line-height: 1.55; margin: 10px 0; }
+.notification-settings label { display: flex; align-items: center; gap: 8px; margin: 9px 0; font-size: 11.5px; }
+.notification-settings fieldset { border: 0; padding: 4px 0 0; margin: 0; }
+.notification-settings legend { color: var(--text-dim); font-size: 11px; }
+.statusline-setup, .data-controls { padding: 14px; margin: 12px 0; }
+.statusline-command code { display: block; padding: 8px; white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; }
+.statusline-command button { margin-top: 8px; }
+.data-controls label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; margin: 10px 0; }
+.data-controls select { color: var(--text); background: #24262d; border: 1px solid var(--stroke); border-radius: 7px; padding: 6px 8px; font: inherit; }
+.data-controls > button { margin: 0 0 5px; }
+.clear-filters { margin: 0 0 10px; }
+:where(summary, select, input):focus-visible { outline: 2px solid var(--indicator-accent); outline-offset: 3px; }

@@ -9,6 +9,10 @@ import { PROVIDER_NAMES } from '../lib/sessionSummary';
 import type { Provider } from '../types';
 import type { Agent, AgentEvent, ProofSummary } from '../types';
 
+function readFilter(key: string, allowed: string[]) {
+  try { const value = localStorage.getItem(`stxic.halo.activity.${key}`); return value && allowed.includes(value) ? value : 'all'; } catch { return 'all'; }
+}
+
 export const ActivityView = memo(function ActivityView({ agents, events, demo, approvedWorkspaces, checks, onVerifyWorkspace, onWorkspaceSettings }: {
   agents: Agent[]; events: AgentEvent[]; demo: boolean;
   approvedWorkspaces: readonly string[];
@@ -21,8 +25,10 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
   const firstWorkspace = workspaces[0]?.key;
   useEffect(() => { if (selection === null && firstWorkspace) setSelection(firstWorkspace); }, [selection, firstWorkspace]);
   const [visibleCount, setVisibleCount] = useState(6);
-  const [providerFilter, setProviderFilter] = useState('all');
-  const [eventFilter, setEventFilter] = useState('all');
+  const [providerFilter, setProviderFilter] = useState(() => readFilter('provider', ['all', ...Object.keys(PROVIDER_NAMES)]));
+  const [eventFilter, setEventFilter] = useState(() => readFilter('event', ['all', 'attention', 'PermissionRequest', 'Error']));
+  useEffect(() => { try { localStorage.setItem('stxic.halo.activity.provider', providerFilter); } catch { /* Session-only fallback. */ } }, [providerFilter]);
+  useEffect(() => { try { localStorage.setItem('stxic.halo.activity.event', eventFilter); } catch { /* Session-only fallback. */ } }, [eventFilter]);
   const [busy, setBusy] = useState<{ key: string; tests: boolean } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [profiles, setProfiles] = useState<Record<string, string>>({});
@@ -71,6 +77,7 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
         <option value="all">All events</option><option value="attention">Needs attention</option><option value="PermissionRequest">Approval requests</option><option value="Error">Errors</option>
       </select></label>
     </div>
+    {(providerFilter !== 'all' || eventFilter !== 'all') && <button type="button" className="inline-action subtle-action clear-filters" onClick={() => { setProviderFilter('all'); setEventFilter('all'); setVisibleCount(6); }}>Clear filters</button>}
     <div className="section-heading first-heading"><h2>Recent activity</h2><span className="subtle-label tabular">{timeline.length} events</span></div>
     {timeline.length > 0 ? <>
       <ol className="activity-timeline" aria-label="Recent activity, newest first">

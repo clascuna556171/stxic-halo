@@ -18,6 +18,9 @@ import HaloMark from './components/HaloMark';
 import { Overview, SystemView } from './components/Dashboard';
 import { ProviderConnections } from './components/ProviderConnections';
 import { ProviderIcon } from './components/ProviderIcon';
+import { ClaudeStatuslineSetup } from './components/ClaudeStatuslineSetup';
+import { DataControls } from './components/DataControls';
+import { useQuotaNotifications } from './components/QuotaNotifications';
 import { ActivityView } from './components/ActivityView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useHaloRuntime } from './hooks/useHaloRuntime';
@@ -248,6 +251,8 @@ const SettingsView = memo(function SettingsView({
         </div>
       </div>
 
+      <ClaudeStatuslineSetup />
+      <DataControls />
       <div className="section-heading"><h2>More coding agents</h2><span className="subtle-label">Opt-in connections</span></div>
       <div className="settings-card"><ProviderConnections /></div>
 
@@ -575,6 +580,7 @@ export default function App() {
     exportError,
   } = useHaloRuntime();
 
+  useQuotaNotifications(shownAgents, usageResult, demo);
   const [workspaceSetup, setWorkspaceSetup] = useState('');
   useEffect(() => { if (tab !== 'settings') setWorkspaceSetup(''); }, [tab]);
 

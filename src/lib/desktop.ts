@@ -509,3 +509,14 @@ export async function exportDiagnosticBundle(): Promise<DiagnosticBundleExport> 
   }
   return invoke<DiagnosticBundleExport>('export_diagnostic_bundle');
 }
+
+export async function prepareClaudeStatusline(): Promise<string> {
+  if (!isTauri()) throw new Error('Open the desktop app to prepare the status line.');
+  return invoke<string>('prepare_claude_statusline');
+}
+
+export type RetentionPreview = { files: number; bytes: number; errors: number };
+export async function haloRetention(days: number, clean = false): Promise<RetentionPreview> {
+  if (!isTauri()) throw new Error('Open the desktop app to manage local data.');
+  return invoke<RetentionPreview>(clean ? 'clean_halo_retention' : 'preview_halo_retention', { days });
+}

@@ -37,9 +37,9 @@ describe('usage panel', () => {
       expect(html).toContain(`<h3>${provider}</h3>`);
     }
     expect(html).not.toContain('<select');
-    expect(html).not.toContain('<details');
+    expect(html).not.toContain('<details class="usage-provider');
     expect(html).toContain('Connect OpenCode in Settings');
-    expect(html).toContain('Claude sends quota through its status line');
+    expect(html).toContain('Claude quota can be supplied by the optional status line');
     expect(html).toContain('Check /usage in Antigravity');
   });
   it('shows usage from multiple providers simultaneously and keeps premium requests separate from dollars', () => {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ProviderIcon } from './ProviderIcon';
+import { QuotaNotificationSettings } from './QuotaNotifications';
 import { relativeTime } from '../lib/format';
 import { isDesktop } from '../lib/desktop';
 import { PROVIDER_NAMES } from '../lib/sessionSummary';
@@ -21,6 +22,7 @@ export function UsageOverview({ agents, result }: { agents: Agent[]; result: Usa
       const enabled = event.target.checked; setAlertsEnabled(enabled);
       try { window.localStorage.setItem('stxic.halo.quotaAlerts', String(enabled)); } catch { /* The current session still uses the selection. */ }
     }} /> Warn in Halo when a fresh quota has 20% or less remaining</label>
+    <QuotaNotificationSettings />
     {lowQuotas.length > 0 && <div className="quota-warnings" role="status">{lowQuotas.map(({ provider, quota, remaining }) =>
       <p key={`${provider}:${quota.label}`}><strong>{PROVIDER_NAMES[provider]} · {quota.label}: {remaining}% left</strong><br />{quota.source} · {relativeTime(quota.observed_at)}</p>)}</div>}
     {!isDesktop() && <p className="usage-unavailable">Browser preview. Local usage readings appear in the desktop app.</p>}
@@ -32,7 +34,7 @@ export function UsageOverview({ agents, result }: { agents: Agent[]; result: Usa
 
 const missingReadings = {
   codex: { quota: 'No quota snapshot in the local Codex logs yet.', session: 'Start a Codex task with the log adapter enabled to receive token totals.' },
-  'claude-code': { quota: 'Claude sends quota through its status line, not lifecycle hooks. No usage export is connected.', session: 'Claude lifecycle hooks report activity only. Tokens and cost need a separate usage source.' },
+  'claude-code': { quota: 'Claude quota can be supplied by the optional status line in Settings. No recent reading is available.', session: 'Claude lifecycle hooks report activity only. Tokens and cost need a separate usage source.' },
   antigravity: { quota: 'Antigravity hooks do not report quota. Check /usage in Antigravity for your account limits.', session: 'Antigravity hooks report activity only; token totals and cost are not included.' },
   'github-copilot': { quota: 'Copilot session logs do not provide account allowance. Check /usage in Copilot.', session: 'Enable Copilot local usage logs in Settings. Totals appear after CLI checkpoints or shutdown.' },
   opencode: { quota: 'OpenCode does not publish account quota through this plugin. Check your model provider’s usage page.', session: 'Connect OpenCode in Settings, then finish a turn to publish tokens and reported cost.' },
