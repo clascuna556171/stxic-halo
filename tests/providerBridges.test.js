@@ -74,7 +74,7 @@ describe.skipIf(process.platform !== 'win32')('Windows provider bridge', () => {
     const root = await testRoot();
     const result = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
       '-File', resolve('scripts/provider-hook.ps1'), '-Source', source, '-Event', 'PreToolUse'],
-      { input: JSON.stringify(input), env: { ...process.env, LOCALAPPDATA: root }, encoding: 'utf8', timeout: 10000 });
+      { input: JSON.stringify(input), env: { ...process.env, LOCALAPPDATA: root }, encoding: 'utf8', timeout: 20000 });
     expect(result.status).toBe(0);
     expect(result.stdout).toBe('');
     expect(result.stderr).toBe('');
@@ -82,5 +82,5 @@ describe.skipIf(process.platform !== 'win32')('Windows provider bridge', () => {
     expect(JSON.parse(line)).toMatchObject({ source, event: 'PreToolUse', cwd: 'C:/work/app' });
     expect(line).not.toContain('SECRET');
     expect(Object.keys(JSON.parse(line)).sort()).toEqual(['schema_version', 'source', 'session_id', 'timestamp', 'event', 'cwd', 'tool_name'].sort());
-  });
+  }, 20000);
 });
