@@ -1,6 +1,7 @@
+import { ProviderIcon } from './ProviderIcon';
 import { memo, useEffect, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
-import { activityLabel, activityWorkspaces, checkSummary, recentActivity, workspaceIdentity } from '../lib/activity';
+import { activityLabel, activityWorkspaces, checkSummary, filterActivity, recentActivity, workspaceIdentity } from '../lib/activity';
 import { ALLOWLISTED_TEST_PROFILES } from '../lib/proofOfWork';
 import { isDesktop } from '../lib/desktop';
 import { relativeTime } from '../lib/format';
@@ -20,13 +21,15 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
   const firstWorkspace = workspaces[0]?.key;
   useEffect(() => { if (selection === null && firstWorkspace) setSelection(firstWorkspace); }, [selection, firstWorkspace]);
   const [visibleCount, setVisibleCount] = useState(6);
+  const [providerFilter, setProviderFilter] = useState('all');
+  const [eventFilter, setEventFilter] = useState('all');
   const [busy, setBusy] = useState<{ key: string; tests: boolean } | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const running = useRef(false);
   const key = selection === null ? workspaces[0]?.key : selection;
   const selected = workspaces.find(workspace => workspace.key === key);
-  const timeline = recentActivity(events, selected?.path, selected?.sessionIds);
+  const timeline = filterActivity(recentActivity(events, selected?.path, selected?.sessionIds), providerFilter, eventFilter);
   const proof = selected ? checks[selected.key] ?? selected.proof : null;
   const summary = checkSummary(proof);
   const authorized = Boolean(selected && approvedWorkspaces.some(path => workspaceIdentity(path) === selected.key));
@@ -60,11 +63,20 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
       {selected && <p className="activity-path" title={selected.path}>{selected.path}</p>}
     </div>}
 
+    <div className="activity-filters">
+      <label>Provider<select value={providerFilter} onChange={event => { setProviderFilter(event.target.value); setVisibleCount(6); }}>
+        <option value="all">All providers</option>{Object.entries(PROVIDER_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+      </select></label>
+      <label>Event<select value={eventFilter} onChange={event => { setEventFilter(event.target.value); setVisibleCount(6); }}>
+        <option value="all">All events</option><option value="attention">Needs attention</option><option value="PermissionRequest">Approval requests</option><option value="Error">Errors</option>
+      </select></label>
+    </div>
     <div className="section-heading first-heading"><h2>Recent activity</h2><span className="subtle-label tabular">{timeline.length} events</span></div>
     {timeline.length > 0 ? <>
       <ol className="activity-timeline" aria-label="Recent activity, newest first">
         {timeline.slice(0, visibleCount).map((event, index) => <li key={`${event.source}:${event.session_id}:${event.timestamp}:${event.event}:${index}`}>
           <span className={`activity-event-mark ${event.event === 'PermissionRequest' || event.event === 'Error' ? 'needs-attention' : ''}`} aria-hidden="true" />
+          <ProviderIcon provider={event.source in PROVIDER_NAMES ? event.source as Provider : 'other'} />
           <div><strong>{activityLabel(event)}</strong><span>{PROVIDER_NAMES[event.source as Provider] ?? 'Agent'}{!selected && event.cwd ? ` · ${workspaces.find(w => w.key === workspaceIdentity(event.cwd!))?.label ?? 'Workspace'}` : ''}</span></div>
           <time dateTime={event.timestamp}>{demo ? 'Sample' : relativeTime(event.timestamp)}</time>
         </li>)}
@@ -72,7 +84,7 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
       {timeline.length > visibleCount && <button type="button" className="inline-action subtle-action" onClick={() => setVisibleCount(count => count + 6)}>Show earlier activity</button>}
     </> : <div className="overview-empty">
       <Activity size={24} aria-hidden="true" /><strong>No activity yet</strong>
-      <p>{selected ? 'New actions from this workspace will appear here.' : 'Start a coding task to see what your agent is doing.'}</p>
+      <p>{providerFilter !== 'all' || eventFilter !== 'all' ? 'No events match these filters. Try another provider or event.' : selected ? 'New actions from this workspace will appear here.' : 'Start a coding task to see what your agent is doing.'}</p>
     </div>}
 
     {selected ? <details className="activity-checks" key={selected.key}>

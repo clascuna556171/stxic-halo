@@ -43,8 +43,10 @@ describe('settings persistence & sanitization', () => {
       ],
     };
     const sanitized = sanitizeSettings(raw as any);
-    expect(sanitized.schema_version).toBe(2);
+    expect(sanitized.schema_version).toBe(3);
     expect(sanitized.process_reconciliation).toBe(true);
+    expect(sanitized.enable_copilot_usage_logs).toBe(false);
+    expect(sanitizeSettings({ enable_copilot_usage_logs: true }).enable_copilot_usage_logs).toBe(true);
     expect(sanitized.approved_workspaces).toEqual(['C:\\Projects\\App', 'D:\\Other']);
   });
 });

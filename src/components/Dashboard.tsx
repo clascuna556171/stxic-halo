@@ -22,6 +22,8 @@ import type {
 import { gib, percent, relativeTime } from '../lib/format';
 import { contextBudget, currentSessions, PROVIDER_NAMES } from '../lib/sessionSummary';
 import { UsageOverview } from './UsageOverview';
+import { ProviderIcon } from './ProviderIcon';
+import { ConnectionHealth } from './ConnectionHealth';
 import type { UsageReadResult } from '../types';
 
 const statusLabel: Record<Agent['status'], string> = {
@@ -83,7 +85,7 @@ export const AttentionCard = memo(function AttentionCard({
 });
 
 export const Overview = memo(function Overview({
-  agents, alerts, onReview, onAcknowledgeAlert, onConnect, claudeHookStatus, usageResult,
+  agents, alerts, onReview, onAcknowledgeAlert, onConnect, claudeHookStatus, usageResult, codexLogsEnabled,
 }: {
   agents: Agent[];
   alerts: AlertItem[];
@@ -92,6 +94,7 @@ export const Overview = memo(function Overview({
   onConnect: () => void;
   claudeHookStatus?: ClaudeHookStatus | null;
   usageResult: UsageReadResult;
+  codexLogsEnabled: boolean;
 }) {
   const sessions = currentSessions(agents);
   return (
@@ -105,7 +108,7 @@ export const Overview = memo(function Overview({
         const budget = contextBudget(agent);
         return <button className="session-row" type="button" key={agent.id} onClick={onReview}>
           <span className="session-row-heading">
-            <strong>{providerBadge[agent.provider]}</strong>
+            <strong className="provider-label"><ProviderIcon provider={agent.provider} />{providerBadge[agent.provider]}</strong>
             <span className={`session-state ${agent.status}`}>{statusLabel[agent.status]}</span>
           </span>
           <span className="session-row-workspace">{agent.workspace}</span>
@@ -121,6 +124,7 @@ export const Overview = memo(function Overview({
         {!agents.length && !claudeHookStatus?.installed && <button type="button" className="inline-action" onClick={onConnect}>Manage connections</button>}
         {agents.length > 0 && <button type="button" className="inline-action subtle-action" onClick={onReview}>View recent activity</button>}
       </div>}
+      <ConnectionHealth agents={agents} claudeHookStatus={claudeHookStatus} codexLogsEnabled={codexLogsEnabled} onConnect={onConnect} />
       <UsageOverview agents={agents} result={usageResult} />
     </div>
   );

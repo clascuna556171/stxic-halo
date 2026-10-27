@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { providerUsage, quotaState, usageAge } from '../src/lib/usage';
+import { lowQuotaWarnings, providerUsage, quotaState, usageAge } from '../src/lib/usage';
 import { parseCodexRolloutLines, reduceCodexSessions } from '../src/lib/codexAdapter';
 import { sessionsFromEvents, PROVIDER_ADAPTERS } from '../src/lib/agentEvents';
 import { reconcileSessions } from '../src/lib/sessionReconciliation';
@@ -78,4 +78,11 @@ describe('additional provider lifecycle', () => {
     const reconciled = reconcileSessions(sessions, { available: true, refreshed_at: Date.now() + 60000, processes: [], claude_processes: 0, codex_processes: 0 });
     expect(reconciled.every(a => a.status === 'working' && a.liveness === 'unverified')).toBe(true);
   });
+});
+
+it('warns only for fresh unexpired low quotas', () => {
+  const now = Date.now();
+  const make = (label: string, used_percent: number, observed_at: string, resets_at: number) => ({ label, used_percent, observed_at, resets_at });
+  const quotas = [make('low', 80, new Date(now).toISOString(), now / 1000 + 3600), make('fine', 79, new Date(now).toISOString(), now / 1000 + 3600), make('stale', 95, new Date(now - 16 * 60000).toISOString(), now / 1000 + 3600), make('expired', 99, new Date(now).toISOString(), now / 1000 - 1)];
+  expect(lowQuotaWarnings([], [report({ quotas })], now).map(w => w.quota.label)).toEqual(['low']);
 });

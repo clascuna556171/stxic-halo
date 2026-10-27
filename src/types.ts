@@ -170,6 +170,7 @@ export interface UserSettings {
   stale_minutes: number;
   approved_workspaces?: string[];
   enable_codex_logs?: boolean;
+  enable_copilot_usage_logs?: boolean;
   process_reconciliation?: boolean;
 }
 

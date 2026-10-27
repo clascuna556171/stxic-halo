@@ -13,7 +13,8 @@ use std::{
 /// - v1: initial schema (poll cadence, monitor, alerts, workspaces, Codex toggle).
 /// - v2: adds `process_reconciliation`; normalizes and de-duplicates approved workspaces
 ///   case-insensitively (v1 `dedup()` only removed consecutive duplicates).
-pub const CURRENT_SCHEMA_VERSION: u32 = 2;
+/// - v3: adds an opt-in Copilot session usage reader.
+pub const CURRENT_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -30,6 +31,7 @@ pub struct UserSettings {
     pub stale_minutes: u32,
     pub approved_workspaces: Vec<String>,
     pub enable_codex_logs: bool,
+    pub enable_copilot_usage_logs: bool,
     /// Cross-check working/waiting sessions against running provider processes.
     pub process_reconciliation: bool,
 }
@@ -49,6 +51,7 @@ impl Default for UserSettings {
             stale_minutes: 15,
             approved_workspaces: Vec::new(),
             enable_codex_logs: true,
+            enable_copilot_usage_logs: false,
             process_reconciliation: true,
         }
     }
@@ -137,6 +140,10 @@ pub fn migrate_value(mut value: Value) -> Result<(Value, u32), String> {
             *list = paths.into_iter().map(Value::String).collect();
         }
         version = 2;
+    }
+    if version == 2 {
+        obj.entry("enable_copilot_usage_logs").or_insert(Value::Bool(false));
+        version = 3;
     }
     // Future versions are read best-effort: unknown keys are ignored by serde.
     obj.insert(
@@ -306,7 +313,19 @@ mod tests {
         assert_eq!(settings.schema_version, CURRENT_SCHEMA_VERSION);
         assert_eq!(settings.poll_interval_ms, 5000);
         assert!(settings.process_reconciliation);
+        assert!(!settings.enable_copilot_usage_logs);
         assert_eq!(settings.approved_workspaces, vec!["C:\\Work\\App", "D:\\Other"]);
+    }
+
+    #[test]
+    fn migrates_v2_without_enabling_copilot_log_access() {
+        let (settings, from) = parse_settings(r#"{ "schema_version": 2, "enable_codex_logs": false }"#).unwrap();
+        assert_eq!(from, 2);
+        assert_eq!(settings.schema_version, 3);
+        assert!(!settings.enable_copilot_usage_logs);
+        assert!(!settings.enable_codex_logs);
+        let (enabled, _) = parse_settings(r#"{ "schema_version": 3, "enable_copilot_usage_logs": true }"#).unwrap();
+        assert!(enabled.enable_copilot_usage_logs);
     }
 
     #[test]

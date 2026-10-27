@@ -7,7 +7,7 @@ import type { UserSettings } from '../types';
 export const SETTINGS_STORAGE_KEY = 'stxic.halo.settings.v1';
 
 /** Keep in sync with `CURRENT_SCHEMA_VERSION` in `src-tauri/src/config.rs`. */
-export const CURRENT_SETTINGS_SCHEMA = 2;
+export const CURRENT_SETTINGS_SCHEMA = 3;
 
 export const DEFAULT_SETTINGS: UserSettings = {
   schema_version: CURRENT_SETTINGS_SCHEMA,
@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   stale_minutes: 15,
   approved_workspaces: [],
   enable_codex_logs: true,
+  enable_copilot_usage_logs: false,
   process_reconciliation: true,
 };
 
@@ -60,6 +61,7 @@ export function dedupeWorkspaces(list: readonly unknown[]): string[] {
  * Sanitizes and migrates settings of any schema version to the current one.
  * - v1 → v2: adds `process_reconciliation` (default on); workspace list de-duplicated
  *   case-insensitively.
+ * - v2 → v3: Copilot session usage reading is opt-in.
  * - Newer versions: known fields are kept, unknown fields dropped.
  */
 export function sanitizeSettings(raw?: Partial<UserSettings> | null): UserSettings {
@@ -81,6 +83,7 @@ export function sanitizeSettings(raw?: Partial<UserSettings> | null): UserSettin
       ? dedupeWorkspaces(raw.approved_workspaces)
       : [],
     enable_codex_logs: bool(raw.enable_codex_logs, DEFAULT_SETTINGS.enable_codex_logs!),
+    enable_copilot_usage_logs: bool(raw.enable_copilot_usage_logs, DEFAULT_SETTINGS.enable_copilot_usage_logs!),
     process_reconciliation: bool(
       raw.process_reconciliation,
       DEFAULT_SETTINGS.process_reconciliation!

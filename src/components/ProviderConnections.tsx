@@ -1,3 +1,4 @@
+import { ProviderIcon } from './ProviderIcon';
 import { useEffect, useState } from 'react';
 import { isDesktop, readProviderConnections, setProviderConnection } from '../lib/desktop';
 import { PROVIDER_NAMES } from '../lib/sessionSummary';
@@ -33,8 +34,8 @@ export function ProviderConnections() {
       const connection = connections.find(c => c.provider === provider);
       return <div className="setting-row" key={provider}>
         <div className="setting-description">
-          <strong>{PROVIDER_NAMES[provider]}{provider === 'github-copilot' ? ' CLI' : ''}</strong>
-          <p>{provider === 'opencode' ? 'Local plugin · activity, session tokens and reported cost.' : provider === 'github-copilot' ? 'Hooks add activity. Existing CLI logs provide tokens and premium-request totals.' : 'Local hooks · activity. Usage requires a local export.'}</p>
+          <strong className="provider-label"><ProviderIcon provider={provider} />{PROVIDER_NAMES[provider]}{provider === 'github-copilot' ? ' CLI' : ''}</strong>
+          <p>{provider === 'opencode' ? 'Local plugin · activity, session tokens and reported cost.' : provider === 'github-copilot' ? 'Hooks add activity. Turn on local usage logs separately for token and premium-request totals.' : 'Local hooks · activity. Usage requires a local export.'}</p>
           <small>{connection?.installed ? 'Bridge installed · restart provider after changes' : 'Not connected'}</small>
           {connection && <details className="connection-path"><summary>Configuration file</summary><code>{connection.config_path}</code></details>}
         </div>

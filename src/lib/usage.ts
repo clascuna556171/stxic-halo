@@ -50,3 +50,11 @@ export function providerUsage(provider: Provider, agents: readonly Agent[], repo
   return { sessions: [...sessions.values()].sort((a, b) => Date.parse(b.observed_at) - Date.parse(a.observed_at)).slice(0, 16),
     quotas: [...quotas.values()].sort((a, b) => a.label.localeCompare(b.label)) };
 }
+
+/** Warnings only use unexpired, recent quota observations; never infer allowances. */
+export function lowQuotaWarnings(agents: readonly Agent[], reports: readonly ProviderUsageReport[], now = Date.now()) {
+  return USAGE_PROVIDERS.flatMap(provider => providerUsage(provider, agents, reports).quotas.flatMap(quota => {
+    const state = quotaState(quota, now);
+    return state && !state.stale && state.remaining <= 20 ? [{ provider, quota, remaining: state.remaining }] : [];
+  }));
+}

@@ -1,6 +1,8 @@
 //! Fixed-path, bounded, metadata-only usage exports. No credentials or network access.
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Read, path::Path};
+use std::{fs::File, io::Read, path::Path, sync::Mutex};
+use tauri::State;
+use crate::config::UserSettings;
 
 pub const PROVIDERS: [&str; 5] = ["claude-code", "codex", "antigravity", "github-copilot", "opencode"];
 
@@ -79,8 +81,18 @@ pub struct UsageReadResult {
     pub errors: Vec<String>,
 }
 
+fn append_copilot_usage<F>(enabled: bool, result: &mut UsageReadResult, read: F)
+where F: FnOnce() -> (Vec<ProviderUsageReport>, Vec<String>) {
+    if enabled {
+        let (reports, errors) = read();
+        result.reports.extend(reports);
+        result.errors.extend(errors);
+    }
+}
+
 #[tauri::command]
-pub fn read_usage_reports() -> Result<UsageReadResult, String> {
+pub fn read_usage_reports(settings: State<'_, Mutex<UserSettings>>) -> Result<UsageReadResult, String> {
+    let read_copilot = settings.lock().map_err(|_| "Settings unavailable")?.enable_copilot_usage_logs;
     let root = crate::paths::app_data_dir()?.join("usage");
     let mut result = UsageReadResult::default();
     for provider in PROVIDERS {
@@ -90,9 +102,7 @@ pub fn read_usage_reports() -> Result<UsageReadResult, String> {
             Err(error) => result.errors.push(error),
         }
     }
-    let (copilot_reports, copilot_errors) = crate::copilot_usage::read_local_usage();
-    result.reports.extend(copilot_reports);
-    result.errors.extend(copilot_errors);
+    append_copilot_usage(read_copilot, &mut result, crate::copilot_usage::read_local_usage);
     // One snapshot per OpenCode session prevents independent hosts overwriting
     // one another. Inspect at most 32 entries and read the newest 16 bounded files.
     let mut files: Vec<_> = std::fs::read_dir(root.join("opencode-sessions")).into_iter().flatten()
@@ -113,6 +123,14 @@ pub fn read_usage_reports() -> Result<UsageReadResult, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn copilot_reader_runs_only_when_enabled() {
+        let mut result = UsageReadResult::default();
+        append_copilot_usage(false, &mut result, || panic!("disabled reader must not run"));
+        append_copilot_usage(true, &mut result, || (vec![], vec!["reader ran".into()]));
+        assert_eq!(result.errors, vec!["reader ran"]);
+    }
 
     #[test]
     fn validates_source_and_rejects_misleading_metrics() {

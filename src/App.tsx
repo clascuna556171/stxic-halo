@@ -17,6 +17,7 @@ import {
 import HaloMark from './components/HaloMark';
 import { Overview, SystemView } from './components/Dashboard';
 import { ProviderConnections } from './components/ProviderConnections';
+import { ProviderIcon } from './components/ProviderIcon';
 import { ActivityView } from './components/ActivityView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useHaloRuntime } from './hooks/useHaloRuntime';
@@ -118,7 +119,7 @@ const SettingsView = memo(function SettingsView({
         <div className="setting-row" style={{ alignItems: 'flex-start' }}>
           <div className="setting-description">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <strong>Claude Code Lifecycle Bridge</strong>
+              <strong className="provider-label"><ProviderIcon provider="claude-code" />Claude Code Lifecycle Bridge</strong>
               <span
                 className={`integration-tag ${
                   claudeHookStatus?.installed
@@ -196,8 +197,8 @@ const SettingsView = memo(function SettingsView({
 
         <div className="setting-row">
           <div className="setting-description">
-            <strong>OpenAI Codex log adapter</strong>
-            <p>Ingest local Codex rollout logs from ~/.codex/sessions.</p>
+            <strong className="provider-label"><ProviderIcon provider="codex" />OpenAI Codex log adapter</strong>
+            <p>Read local session files for activity and usage. Halo processes log lines locally; no credentials are used. Check your account terms.</p>
           </div>
           <button
             type="button"
@@ -210,6 +211,18 @@ const SettingsView = memo(function SettingsView({
           >
             <span />
           </button>
+        </div>
+
+        <div className="setting-divider" />
+
+        <div className="setting-row">
+          <div className="setting-description">
+            <strong className="provider-label"><ProviderIcon provider="github-copilot" />Copilot local usage logs</strong>
+            <p>Read session files locally for token and premium-request totals. Independent of the Copilot activity bridge; off by default.</p>
+          </div>
+          <button type="button" className={`toggle ${settings.enable_copilot_usage_logs ? 'on' : ''}`}
+            aria-label="Read Copilot local usage logs" aria-pressed={settings.enable_copilot_usage_logs === true}
+            onClick={() => updateSettings({ enable_copilot_usage_logs: !settings.enable_copilot_usage_logs })}><span /></button>
         </div>
 
         <div className="setting-divider" />
@@ -777,6 +790,7 @@ export default function App() {
                 {permissions.notice && <p className="permission-message" role="status">{permissions.notice}</p>}
                 {tab === 'overview' && (
                   <Overview
+                    codexLogsEnabled={settings.enable_codex_logs !== false}
                     usageResult={usageResult}
                     agents={shownAgents}
                     alerts={activeAlerts.filter(alert => alert.agent.id !== pendingPermission?.session_id)}

@@ -1,3 +1,4 @@
+import { PROVIDER_NAMES } from './sessionSummary';
 import type { Agent, AgentEvent, ProofSummary } from '../types';
 import { displayPath } from './agentEvents';
 
@@ -68,4 +69,9 @@ export function checkSummary(proof: ProofSummary | null | undefined) {
     tests: failed && failed > 0 ? `${failed} tests failed` : proof?.verified && passed && passed > 0 ? `${passed} tests passed` : passed != null ? 'No passing tests confirmed' : 'Tests not run',
     failed: Boolean(failed && failed > 0),
   };
+}
+
+export function filterActivity(events: readonly AgentEvent[], provider: string, eventType: string) {
+  return events.filter(event => provider === 'all' || (provider === 'other' ? !(event.source in PROVIDER_NAMES) || event.source === 'other' : event.source === provider))
+    .filter(event => eventType === 'all' || (eventType === 'attention' ? ['PermissionRequest', 'Error'].includes(event.event) : event.event === eventType));
 }

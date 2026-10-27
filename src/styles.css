@@ -1726,3 +1726,23 @@ html:has(.floating-close) {
   background-color: #07080a;
   background-image: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.06) 0%, #07080a 52%);
 }
+
+/* Provider marks complement their text labels and do not carry status. */
+.provider-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.provider-icon { display: inline-flex; flex: 0 0 24px; width: 24px; height: 24px; align-items: center; justify-content: center; border: 1px solid var(--stroke); border-radius: 7px; background: var(--stroke-subtle); color: var(--text); font-size: 12px; font-weight: 700; line-height: 1; }
+.provider-icon svg { width: 15px; height: 15px; }
+.usage-provider-heading { align-items: center; }
+.activity-timeline .provider-icon { margin-top: 1px; }
+
+.activity-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 14px; }
+.activity-filters label { display: grid; gap: 6px; color: var(--text-dim); font-size: 12px; }
+.connection-health { margin-top: 16px; border-top: 1px solid var(--stroke); padding-top: 12px; }
+.connection-health summary { cursor: pointer; font-size: 13px; font-weight: 600; }
+.connection-health > p { color: var(--text-dim); font-size: 11px; line-height: 1.5; margin: 10px 0; }
+.connection-health-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; padding: 7px 0; border-bottom: 1px solid var(--stroke-subtle); font-size: 11px; }
+.connection-health-row > span:last-child { color: var(--text-dim); }
+.connection-health > button { margin-top: 10px; }
+.quota-alert-toggle { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0; font-size: 11px; line-height: 1.5; }
+.quota-alert-toggle input { margin-top: 2px; }
+.quota-warnings { padding: 8px 10px; border: 1px solid var(--indicator-warning); border-radius: 8px; font-size: 11px; line-height: 1.5; }
+.quota-warnings p + p { margin-top: 8px; }

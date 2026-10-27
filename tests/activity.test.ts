@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activityLabel, activityWorkspaces, applyWorkspaceChecks, checkSummary, recentActivity, workspaceIdentity } from '../src/lib/activity';
+import { activityLabel, activityWorkspaces, applyWorkspaceChecks, checkSummary, filterActivity, recentActivity, workspaceIdentity } from '../src/lib/activity';
 import type { Agent, AgentEvent, ProofSummary } from '../src/types';
 
 const event = (patch: Partial<AgentEvent> = {}): AgentEvent => ({ schema_version: 1, source: 'codex',
@@ -53,4 +53,11 @@ describe('Activity workspace flow', () => {
     expect(activityLabel(event({ event: 'PermissionRequest' }))).toBe('Waiting for your approval');
     expect(activityLabel(event({ event: 'Stop' }))).toBe('Agent finished its turn');
   });
+});
+
+it('filters by provider and attention category together', () => {
+  const events = [event({ event: 'Error' }), event({ event: 'PermissionRequest', source: 'claude-code' }), event(), event({ source: 'unknown', event: 'Error' })];
+  expect(filterActivity(events, 'codex', 'attention')).toEqual([events[0]]);
+  expect(filterActivity(events, 'all', 'PermissionRequest')).toEqual([events[1]]);
+  expect(filterActivity(events, 'other', 'all')).toEqual([events[3]]);
 });
