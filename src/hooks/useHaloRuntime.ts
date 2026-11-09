@@ -543,11 +543,14 @@ export function useHaloRuntime() {
     }
   }, [expanded, tab, metrics]);
 
-  // When expanding or previewing, trigger an immediate fast refresh
+  // When expanding or previewing, defer the fast refresh slightly (~180ms)
+  // so IPC work and state updates never contend with the initial window/CSS animation frames.
   useEffect(() => {
-    if (expanded || preview) {
+    if (!expanded && !preview) return;
+    const timerId = window.setTimeout(() => {
       void pollNow();
-    }
+    }, 180);
+    return () => window.clearTimeout(timerId);
   }, [expanded, preview, pollNow]);
 
   // Adaptive background polling timer: throttles cadence when collapsed and idle

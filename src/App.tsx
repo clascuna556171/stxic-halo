@@ -597,7 +597,7 @@ export default function App() {
   const hover = useMemo(() => createHoverDisclosure(
     () => { if (!expanded) setPreview(true); },
     () => setPreview(false),
-    () => true,
+    () => true, 65, 320,
   ), [expanded, setPreview]);
   useEffect(() => () => hover.cancel(), [hover]);
   useEffect(() => {
@@ -687,11 +687,11 @@ export default function App() {
                 <ChevronDown size={13} className="pill-chevron" />
               </span>
               </span>
-              {preview && <span className="token-preview-body">
+              <span className="token-preview-body" aria-hidden={!preview}>
                 <span className="token-preview-value tabular">{budget ? `${budget.remaining.toLocaleString()} tokens left` : 'Token count unavailable'}</span>
                 <span className="token-preview-detail">{previewAgent ? `${previewAgent.workspace} · ` : ''}{budget ? `${leadWorkingAgent ? 'Context' : 'Last report'} · ${relativeTime(previewAgent!.lastSeen)}` : 'Waiting for provider data'}</span>
                 <span className="token-preview-hint">Click to open dashboard</span>
-              </span>}
+              </span>
             </button>
           ) : (
             <div className={`expanded-card ${isFloatingBezel ? 'floating-bezel' : ''}`}>

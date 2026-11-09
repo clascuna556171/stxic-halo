@@ -42,6 +42,27 @@ describe('notch hover disclosure', () => {
     vi.advanceTimersByTime(350);
     expect(close).toHaveBeenCalledOnce();
   });
+  it('supports optional hover-intent enter delay so brief cursor pass-throughs do not resize the window', () => {
+    vi.useFakeTimers();
+    const open = vi.fn(), close = vi.fn();
+    const hover = createHoverDisclosure(open, close, () => true, 65, 320);
+    hover.enter();
+    vi.advanceTimersByTime(40);
+    hover.leave();
+    vi.advanceTimersByTime(500);
+    expect(open).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
+    close.mockClear();
+
+    hover.enter();
+    vi.advanceTimersByTime(65);
+    expect(open).toHaveBeenCalledOnce();
+    hover.leave();
+    vi.advanceTimersByTime(319);
+    expect(close).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(close).toHaveBeenCalledOnce();
+  });
 });
 
 it('never fabricates pending approvals or successful decisions in browser preview', async () => {

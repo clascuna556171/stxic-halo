@@ -157,14 +157,38 @@ code {
 }
 .app-frame.preview .island { max-width: 340px; }
 .app-frame.preview .browser-help { top: 128px; }
-.notch-summary { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 37px; }
-.collapsed-pill.token-preview { height: 112px; display: block; }
-.token-preview-body { display: flex; flex-direction: column; gap: 4px; padding: 1px 0 10px; }
+.notch-summary { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 37px; flex-shrink: 0; }
+.collapsed-pill.token-preview { height: 112px; box-shadow: var(--notch-shadow); }
+.token-preview-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    max-height 240ms var(--spring-ease),
+    opacity 180ms var(--spring-ease),
+    transform 240ms var(--spring-ease),
+    padding 240ms var(--spring-ease);
+}
+.collapsed-pill.token-preview .token-preview-body {
+  max-height: 74px;
+  opacity: 1;
+  padding: 2px 0 10px;
+  transform: translateY(0);
+  pointer-events: auto;
+}
 .token-preview-value { font-size: 15px; font-weight: 600; }
 .token-preview-detail { color: var(--vibrancy-secondary); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .token-preview-hint { color: var(--vibrancy-secondary); font-size: 10px; }
-.session-row { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 14px 0; background: transparent; color: var(--text); border: 0; border-bottom: 0.5px solid var(--liquid-glass-border); text-align: left; }
+.session-row { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 14px 0; background: transparent; color: var(--text); border: 0; border-bottom: 0.5px solid var(--liquid-glass-border); text-align: left; transition: background 180ms var(--spring-ease), transform 160ms var(--spring-ease); }
 .session-row:hover { background: var(--surface-card-hover); }
+.session-row:active { transform: scale(0.99); }
 .session-row-heading, .session-row-detail { display: flex; justify-content: space-between; gap: 12px; }
 .session-row-heading strong { font-size: 13px; }
 .session-state { font-size: 11px; color: var(--vibrancy-secondary); }
@@ -1825,3 +1849,100 @@ html:has(.floating-close) {
 .usage-provider.no-limits .usage-provider-details { padding-top: 3px; }
 .usage-limit-row meter::-webkit-meter-bar { background: rgba(255,255,255,.12); border: 0; border-radius: 6px; }
 .usage-limit-row meter::-webkit-meter-optimum-value { background: #e7e9ed; border-radius: 6px; }
+
+/* Smoothness & micro-interaction refinements for hover preview and expanded view */
+@keyframes tabPanelReveal {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes disclosureReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.collapsed-pill {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  overflow: hidden;
+  will-change: transform, height;
+  transition:
+    height 240ms var(--spring-ease),
+    background 220ms var(--spring-ease),
+    border-color 220ms var(--spring-ease),
+    box-shadow 220ms var(--spring-ease),
+    transform 240ms var(--spring-ease);
+}
+
+.collapsed-pill:active {
+  transform: scale(0.985);
+}
+
+.collapsed-pill.token-preview .pill-chevron {
+  transform: rotate(180deg);
+  color: var(--vibrancy-primary);
+}
+
+.main-area > .section-scroll {
+  scroll-behavior: smooth;
+  animation: tabPanelReveal 200ms var(--spring-ease);
+}
+
+.activity-filter-panel,
+.activity-checks[open] > .activity-check-content,
+.activity-file-details[open] > .activity-files,
+.usage-provider-details[open] > .usage-account,
+.usage-provider-details[open] > .usage-sessions,
+.usage-provider-details[open] > .usage-footnote,
+.notification-settings[open] > *:not(summary),
+.connection-health[open] > *:not(summary),
+.statusline-setup[open] > *:not(summary),
+.data-controls[open] > *:not(summary) {
+  animation: disclosureReveal 180ms var(--spring-ease);
+}
+
+.toggle span {
+  transition: transform 200ms var(--spring-ease);
+}
+
+.inline-action,
+.icon-button,
+.seg-pill,
+.tab {
+  transition:
+    background 180ms var(--spring-ease),
+    border-color 180ms var(--spring-ease),
+    color 180ms var(--spring-ease),
+    transform 140ms var(--spring-ease);
+}
+
+.inline-action:active:not(:disabled),
+.icon-button:active:not(:disabled),
+.seg-pill:active:not(:disabled),
+.tab:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.usage-provider {
+  transition: background 180ms var(--spring-ease), border-color 180ms var(--spring-ease);
+}
+
+.usage-provider:hover {
+  background: rgba(255, 255, 255, 0.048);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
