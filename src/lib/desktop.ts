@@ -120,6 +120,20 @@ export async function revokeWorkspace(workspacePath: string): Promise<UserSettin
   return saveLocalSettings(updated);
 }
 
+export async function readCodexSnapshot(
+  limit = 8
+): Promise<{ telemetry: CodexSessionTelemetry[]; events: AgentEvent[] }> {
+  if (!isTauri()) return { telemetry: [], events: [] };
+  try {
+    return await invoke<{ telemetry: CodexSessionTelemetry[]; events: AgentEvent[] }>(
+      'read_codex_snapshot',
+      { limit }
+    );
+  } catch {
+    return { telemetry: [], events: [] };
+  }
+}
+
 export async function readCodexTelemetry(limit = 8): Promise<CodexSessionTelemetry[]> {
   if (!isTauri()) return [];
   try {

@@ -38,25 +38,37 @@ use window::{apply_island_bounds, enumerate_monitors, show_and_focus_main, Monit
 pub const AUTOSTART_ARG: &str = "--autostart";
 
 #[tauri::command]
-fn read_metrics(
-    state: State<'_, Mutex<TelemetryCollector>>,
+async fn read_metrics(
+    state: State<'_, Arc<Mutex<TelemetryCollector>>>,
     perf: State<'_, Arc<PerfRegistry>>,
 ) -> Result<Metrics, String> {
-    let mut collector = state
-        .lock()
-        .map_err(|_| "System telemetry collector lock poisoned".to_string())?;
-    Ok(perf.time("metrics_sample", || collector.sample()))
+    let collector = state.inner().clone();
+    let perf = perf.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut guard = collector
+            .lock()
+            .map_err(|_| "System telemetry collector lock poisoned".to_string())?;
+        Ok(perf.time("metrics_sample", || guard.sample()))
+    })
+    .await
+    .map_err(|e| format!("Metrics worker failed: {e}"))?
 }
 
 #[tauri::command]
-fn read_agent_events(
+async fn read_agent_events(
     state: State<'_, Arc<Mutex<EventLogReader>>>,
     perf: State<'_, Arc<PerfRegistry>>,
 ) -> Result<Vec<AgentEvent>, String> {
-    let mut reader = state
-        .lock()
-        .map_err(|_| "Event log reader lock poisoned".to_string())?;
-    perf.time("event_log_read", || reader.read_recent())
+    let reader = state.inner().clone();
+    let perf = perf.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut guard = reader
+            .lock()
+            .map_err(|_| "Event log reader lock poisoned".to_string())?;
+        perf.time("event_log_read", || guard.read_recent())
+    })
+    .await
+    .map_err(|e| format!("Event log worker failed: {e}"))?
 }
 
 #[tauri::command]
@@ -69,14 +81,20 @@ fn clear_agent_events(state: State<'_, Arc<Mutex<EventLogReader>>>) -> Result<()
 
 /// Provider processes used to reconcile hook sessions with real process lifecycle.
 #[tauri::command]
-fn read_process_lifecycle(
-    state: State<'_, Mutex<TelemetryCollector>>,
+async fn read_process_lifecycle(
+    state: State<'_, Arc<Mutex<TelemetryCollector>>>,
     perf: State<'_, Arc<PerfRegistry>>,
 ) -> Result<ProcessLifecycleSnapshot, String> {
-    let mut collector = state
-        .lock()
-        .map_err(|_| "System telemetry collector lock poisoned".to_string())?;
-    Ok(perf.time("process_lifecycle_scan", || collector.provider_processes()))
+    let collector = state.inner().clone();
+    let perf = perf.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut guard = collector
+            .lock()
+            .map_err(|_| "System telemetry collector lock poisoned".to_string())?;
+        Ok(perf.time("process_lifecycle_scan", || guard.provider_processes()))
+    })
+    .await
+    .map_err(|e| format!("Process lifecycle worker failed: {e}"))?
 }
 
 #[tauri::command]
@@ -200,7 +218,7 @@ pub struct IntegrationStatus {
 /// Live integration health. Cheap: metadata reads + one registry query; does not spawn
 /// PowerShell (Claude hook status is queried separately).
 #[tauri::command]
-fn read_integration_status(
+async fn read_integration_status(
     app: AppHandle,
     settings: State<'_, Mutex<UserSettings>>,
     health: State<'_, Mutex<SettingsHealth>>,
@@ -211,24 +229,30 @@ fn read_integration_status(
         .map(|h| h.clone())
         .map_err(|_| "Settings health lock poisoned".to_string())?;
     let codex_enabled = settings.lock().map(|s| s.enable_codex_logs).unwrap_or(false);
-    let event_log = reader
-        .lock()
-        .map(|r| r.status())
-        .map_err(|_| "Event log reader lock poisoned".to_string())?;
-    let sessions_dir = codex::codex_home_dir().map(|h| h.join("sessions"));
+    let reader = reader.inner().clone();
 
-    Ok(IntegrationStatus {
-        settings: settings_health,
-        event_log,
-        codex: CodexSourceStatus {
-            enabled: codex_enabled,
-            sessions_dir_exists: sessions_dir.as_ref().is_some_and(|d| d.exists()),
-            sessions_dir: sessions_dir.map(|d| d.display().to_string()),
-        },
-        launch_at_login: launch_at_login_status(&app),
-        single_instance: true,
-        launched_at_login: std::env::args().any(|a| a == AUTOSTART_ARG),
+    tauri::async_runtime::spawn_blocking(move || {
+        let event_log = reader
+            .lock()
+            .map(|r| r.status())
+            .map_err(|_| "Event log reader lock poisoned".to_string())?;
+        let sessions_dir = codex::codex_home_dir().map(|h| h.join("sessions"));
+
+        Ok(IntegrationStatus {
+            settings: settings_health,
+            event_log,
+            codex: CodexSourceStatus {
+                enabled: codex_enabled,
+                sessions_dir_exists: sessions_dir.as_ref().is_some_and(|d| d.exists()),
+                sessions_dir: sessions_dir.map(|d| d.display().to_string()),
+            },
+            launch_at_login: launch_at_login_status(&app),
+            single_instance: true,
+            launched_at_login: std::env::args().any(|a| a == AUTOSTART_ARG),
+        })
     })
+    .await
+    .map_err(|e| format!("Integration status worker failed: {e}"))?
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -241,15 +265,20 @@ pub struct PerformanceStats {
 }
 
 #[tauri::command]
-fn read_performance_stats(
-    collector: State<'_, Mutex<TelemetryCollector>>,
+async fn read_performance_stats(
+    collector: State<'_, Arc<Mutex<TelemetryCollector>>>,
     perf: State<'_, Arc<PerfRegistry>>,
     profiler: State<'_, Mutex<IdleProfiler>>,
 ) -> Result<PerformanceStats, String> {
-    let footprint = collector
-        .lock()
-        .map(|mut c| c.self_footprint())
-        .map_err(|_| "System telemetry collector lock poisoned".to_string())?;
+    let collector_arc = collector.inner().clone();
+    let footprint = tauri::async_runtime::spawn_blocking(move || {
+        collector_arc
+            .lock()
+            .map(|mut c| c.self_footprint())
+            .map_err(|_| "System telemetry collector lock poisoned".to_string())
+    })
+    .await
+    .map_err(|e| format!("Performance stats worker failed: {e}"))??;
 
     let leak_analysis = if footprint.available {
         if let Ok(mut p) = profiler.lock() {
@@ -410,7 +439,7 @@ pub fn run() {
             MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_ARG]),
         ))
-        .manage(Mutex::new(TelemetryCollector::new()))
+        .manage(Arc::new(Mutex::new(TelemetryCollector::new())))
         .manage(event_reader)
         .manage(Mutex::new(initial_settings.clone()))
         .manage(Mutex::new(settings_health))
@@ -460,6 +489,7 @@ pub fn run() {
             proof_of_work::verify_proof_of_work,
             proof_of_work::approve_workspace,
             proof_of_work::revoke_workspace,
+            codex::read_codex_snapshot,
             codex::read_codex_events,
             codex::read_codex_telemetry,
             claude_manager::check_claude_hook_status,

@@ -26,13 +26,20 @@ export function activityWorkspaces(agents: readonly Agent[], events: readonly Ag
 }
 
 export function recentActivity(events: readonly AgentEvent[], path?: string, sessionIds?: ReadonlySet<string>) {
+  const targetKey = path ? workspaceIdentity(path) : null;
   const seen = new Set<string>();
-  return events.filter(e => !path || (e.cwd ? workspaceIdentity(e.cwd) === workspaceIdentity(path) : sessionIds?.has(e.session_id)))
-    .filter(e => {
-      const key = JSON.stringify([e.source, e.session_id, e.timestamp, e.event, e.tool_name, e.cwd]);
-      if (seen.has(key)) return false;
-      seen.add(key); return true;
-    }).sort((a, b) => time(b.timestamp) - time(a.timestamp));
+  const stamped: Array<{ event: AgentEvent; ts: number }> = [];
+  for (const e of events) {
+    if (targetKey && !(e.cwd ? workspaceIdentity(e.cwd) === targetKey : sessionIds?.has(e.session_id))) {
+      continue;
+    }
+    const key = `${e.source}\0${e.session_id}\0${e.timestamp}\0${e.event}\0${e.tool_name ?? ''}\0${e.cwd ?? ''}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    stamped.push({ event: e, ts: time(e.timestamp) });
+  }
+  stamped.sort((a, b) => b.ts - a.ts);
+  return stamped.map((entry) => entry.event);
 }
 
 export function activityLabel(event: AgentEvent) {

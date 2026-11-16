@@ -179,10 +179,6 @@ pub fn apply_island_bounds_with_preview<R: Runtime>(
         NOTCH_COLLAPSED_HEIGHT_LOGICAL
     };
 
-    window
-        .set_size(LogicalSize::new(logical_width, logical_height))
-        .map_err(|_| "Could not resize Halo window".to_string())?;
-
     let monitors = window.available_monitors().unwrap_or_default();
     let chosen_monitor = monitors
         .get(target_monitor_index)
@@ -196,7 +192,7 @@ pub fn apply_island_bounds_with_preview<R: Runtime>(
         let size = monitor.size();
         let scale = monitor.scale_factor();
 
-        let (x, y, _, _) = calculate_clamped_bounds_with_preview(
+        let (x, y, phys_w, phys_h) = calculate_clamped_bounds_with_preview(
             expanded,
             preview,
             scale,
@@ -208,9 +204,34 @@ pub fn apply_island_bounds_with_preview<R: Runtime>(
             top_inset_px,
         );
 
+        let size_matches = window
+            .outer_size()
+            .ok()
+            .is_some_and(|cur| cur.width == phys_w as u32 && cur.height == phys_h as u32);
+        let pos_matches = window
+            .outer_position()
+            .ok()
+            .is_some_and(|cur| cur.x == x && cur.y == y);
+
+        if size_matches && pos_matches {
+            return Ok(());
+        }
+
+        if !size_matches {
+            window
+                .set_size(LogicalSize::new(logical_width, logical_height))
+                .map_err(|_| "Could not resize Halo window".to_string())?;
+        }
+
+        if !pos_matches {
+            window
+                .set_position(PhysicalPosition::new(x, y))
+                .map_err(|_| "Could not position Halo window".to_string())?;
+        }
+    } else {
         window
-            .set_position(PhysicalPosition::new(x, y))
-            .map_err(|_| "Could not position Halo window".to_string())?;
+            .set_size(LogicalSize::new(logical_width, logical_height))
+            .map_err(|_| "Could not resize Halo window".to_string())?;
     }
 
     Ok(())

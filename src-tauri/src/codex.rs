@@ -1,10 +1,13 @@
 use crate::events::AgentEvent;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     env,
     fs::{self, File},
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
+    sync::{Mutex, OnceLock},
+    time::SystemTime,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -44,33 +47,36 @@ pub fn codex_home_dir() -> Option<PathBuf> {
     None
 }
 
+type CodexCacheEntry = (u64, Option<SystemTime>, CodexSessionTelemetry, Vec<AgentEvent>);
+static CODEX_CACHE: OnceLock<Mutex<BTreeMap<PathBuf, CodexCacheEntry>>> = OnceLock::new();
+
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct CodexSnapshot {
+    pub telemetry: Vec<CodexSessionTelemetry>,
+    pub events: Vec<AgentEvent>,
+}
+
 /// Recursively discovers rollout-*.jsonl files inside ~/.codex/sessions, sorted newest first.
 pub fn find_recent_rollout_files(sessions_dir: &Path, max_files: usize) -> Vec<PathBuf> {
     let mut files = Vec::new();
     collect_rollout_files(sessions_dir, &mut files);
-    // Sort by last modified time descending (newest first)
-    files.sort_by(|a, b| {
-        let m_a = fs::metadata(a).and_then(|m| m.modified()).ok();
-        let m_b = fs::metadata(b).and_then(|m| m.modified()).ok();
-        m_b.cmp(&m_a)
-    });
-    if files.len() > max_files {
-        files.truncate(max_files);
-    }
-    files
+    files.sort_by_key(|(_, modified)| std::cmp::Reverse(*modified));
+    files.truncate(max_files);
+    files.into_iter().map(|(path, _)| path).collect()
 }
 
-fn collect_rollout_files(dir: &Path, acc: &mut Vec<PathBuf>) {
+fn collect_rollout_files(dir: &Path, acc: &mut Vec<(PathBuf, Option<SystemTime>)>) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        if path.is_dir() {
+        if entry.file_type().is_ok_and(|t| t.is_dir()) {
             collect_rollout_files(&path, acc);
         } else if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
             if name.starts_with("rollout-") && name.ends_with(".jsonl") {
-                acc.push(path);
+                let modified = entry.metadata().and_then(|m| m.modified()).ok();
+                acc.push((path, modified));
             }
         }
     }
@@ -81,7 +87,7 @@ fn collect_rollout_files(dir: &Path, acc: &mut Vec<PathBuf>) {
 /// Extracts only: session_id, cwd, timestamp, event type, token counts, and context percentage.
 pub fn parse_rollout_file(path: &Path) -> Result<(CodexSessionTelemetry, Vec<AgentEvent>), String> {
     let file = File::open(path).map_err(|e| format!("Cannot open rollout file: {}", e))?;
-    let reader = BufReader::new(file);
+    let mut reader = BufReader::new(file);
 
     let mut telemetry = CodexSessionTelemetry {
         status: "unknown".to_string(),
@@ -89,13 +95,20 @@ pub fn parse_rollout_file(path: &Path) -> Result<(CodexSessionTelemetry, Vec<Age
         ..Default::default()
     };
     let mut events = Vec::new();
+    let mut line = String::new();
 
-    for line_res in reader.lines() {
-        let line = match line_res {
-            Ok(l) => l,
+    loop {
+        line.clear();
+        let bytes = match reader.read_line(&mut line) {
+            Ok(0) => break,
+            Ok(n) => n,
             Err(_) => continue,
         };
-        if line.trim().is_empty() {
+        if bytes == 0 || line.trim().is_empty() {
+            continue;
+        }
+        // Skip massive response/tool-output lines that cannot carry session_meta or event_msg.
+        if !line.contains("session_meta") && !line.contains("event_msg") {
             continue;
         }
 
@@ -263,6 +276,26 @@ pub fn parse_rollout_file(path: &Path) -> Result<(CodexSessionTelemetry, Vec<Age
     Ok((telemetry, events))
 }
 
+fn read_rollout_cached(
+    cache: &mut BTreeMap<PathBuf, CodexCacheEntry>,
+    path: &Path,
+) -> Option<(CodexSessionTelemetry, Vec<AgentEvent>)> {
+    let meta = fs::metadata(path).ok()?;
+    let len = meta.len();
+    let modified = meta.modified().ok();
+    if let Some((old_len, old_modified, telemetry, events)) = cache.get(path) {
+        if *old_len == len && *old_modified == modified && modified.is_some() {
+            return Some((telemetry.clone(), events.clone()));
+        }
+    }
+    let (telemetry, events) = parse_rollout_file(path).ok()?;
+    cache.insert(
+        path.to_path_buf(),
+        (len, modified, telemetry.clone(), events.clone()),
+    );
+    Some((telemetry, events))
+}
+
 pub fn read_local_codex_sessions(
     max_sessions: usize,
 ) -> Result<(Vec<CodexSessionTelemetry>, Vec<AgentEvent>), String> {
@@ -277,11 +310,17 @@ pub fn read_local_codex_sessions(
     }
 
     let files = find_recent_rollout_files(&sessions_dir, max_sessions);
+    let mut cache = CODEX_CACHE
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .map_err(|_| "Codex cache lock poisoned".to_string())?;
+    cache.retain(|path, _| files.iter().any(|file| file == path));
+
     let mut telemetries = Vec::new();
     let mut all_events = Vec::new();
 
     for file in files {
-        if let Ok((telemetry, mut evs)) = parse_rollout_file(&file) {
+        if let Some((telemetry, mut evs)) = read_rollout_cached(&mut cache, &file) {
             if !telemetry.session_id.is_empty() {
                 telemetries.push(telemetry);
                 all_events.append(&mut evs);
@@ -293,15 +332,36 @@ pub fn read_local_codex_sessions(
 }
 
 #[tauri::command]
-pub fn read_codex_telemetry(limit: Option<usize>) -> Result<Vec<CodexSessionTelemetry>, String> {
-    let (telemetry, _) = read_local_codex_sessions(limit.unwrap_or(8))?;
-    Ok(telemetry)
+pub async fn read_codex_snapshot(limit: Option<usize>) -> Result<CodexSnapshot, String> {
+    let max_sessions = limit.unwrap_or(8);
+    tauri::async_runtime::spawn_blocking(move || {
+        let (telemetry, events) = read_local_codex_sessions(max_sessions)?;
+        Ok(CodexSnapshot { telemetry, events })
+    })
+    .await
+    .map_err(|e| format!("Codex snapshot worker failed: {e}"))?
 }
 
 #[tauri::command]
-pub fn read_codex_events(limit: Option<usize>) -> Result<Vec<AgentEvent>, String> {
-    let (_, events) = read_local_codex_sessions(limit.unwrap_or(8))?;
-    Ok(events)
+pub async fn read_codex_telemetry(limit: Option<usize>) -> Result<Vec<CodexSessionTelemetry>, String> {
+    let max_sessions = limit.unwrap_or(8);
+    tauri::async_runtime::spawn_blocking(move || {
+        let (telemetry, _) = read_local_codex_sessions(max_sessions)?;
+        Ok(telemetry)
+    })
+    .await
+    .map_err(|e| format!("Codex telemetry worker failed: {e}"))?
+}
+
+#[tauri::command]
+pub async fn read_codex_events(limit: Option<usize>) -> Result<Vec<AgentEvent>, String> {
+    let max_sessions = limit.unwrap_or(8);
+    tauri::async_runtime::spawn_blocking(move || {
+        let (_, events) = read_local_codex_sessions(max_sessions)?;
+        Ok(events)
+    })
+    .await
+    .map_err(|e| format!("Codex events worker failed: {e}"))?
 }
 
 #[cfg(test)]
@@ -368,5 +428,41 @@ mod tests {
         assert_eq!(events[0].event, "SessionStart");
         assert_eq!(events[1].event, "PreToolUse");
         assert_eq!(events[2].event, "Stop");
+    }
+
+    #[test]
+    fn rollout_cache_reuses_unchanged_file_and_invalidates_on_append() {
+        let tmp_file = std::env::temp_dir().join(format!(
+            "halo-codex-cache-test-{}.jsonl",
+            std::process::id()
+        ));
+        let initial = concat!(
+            "{\"timestamp\":\"2026-10-25T10:00:00Z\",\"type\":\"session_meta\",\"payload\":{\"session_id\":\"s-cache\",\"cwd\":\"C:\\\\work\"}}\n",
+            "{\"timestamp\":\"2026-10-25T10:00:30Z\",\"type\":\"response_item\",\"payload\":{\"text\":\"ignored-large-line\"}}\n"
+        );
+        fs::write(&tmp_file, initial).unwrap();
+
+        let mut cache = BTreeMap::new();
+        let (t1, e1) = read_rollout_cached(&mut cache, &tmp_file).unwrap();
+        assert_eq!(t1.session_id, "s-cache");
+        assert_eq!(t1.status, "working");
+        assert_eq!(e1.len(), 1);
+        assert_eq!(cache.len(), 1);
+
+        let (t2, e2) = read_rollout_cached(&mut cache, &tmp_file).unwrap();
+        assert_eq!(t2.status, t1.status);
+        assert_eq!(e2.len(), e1.len());
+
+        let updated = format!(
+            "{}{}",
+            initial,
+            "{\"timestamp\":\"2026-10-25T10:01:00Z\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_complete\"}}\n"
+        );
+        fs::write(&tmp_file, updated).unwrap();
+
+        let (t3, e3) = read_rollout_cached(&mut cache, &tmp_file).unwrap();
+        let _ = fs::remove_file(&tmp_file);
+        assert_eq!(t3.status, "completed");
+        assert_eq!(e3.len(), 2);
     }
 }

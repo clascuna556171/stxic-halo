@@ -4,7 +4,7 @@ use std::{
     fs,
     io::Write,
     path::Path,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -54,8 +54,18 @@ fn read_request(dir: &Path, id: &str, now: u64) -> Result<PermissionRequest, Str
 }
 
 fn list_pending(dir: &Path, now: u64) -> Result<Vec<PermissionRequest>, String> {
-    fs::create_dir_all(dir).map_err(|_| "Cannot create permission mailbox")?;
-    fs::write(dir.join("heartbeat"), b"active").map_err(|_| "Cannot update permission bridge")?;
+    if !dir.is_dir() {
+        fs::create_dir_all(dir).map_err(|_| "Cannot create permission mailbox")?;
+    }
+    let heartbeat = dir.join("heartbeat");
+    let heartbeat_fresh = fs::metadata(&heartbeat)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age < Duration::from_millis(900));
+    if !heartbeat_fresh {
+        fs::write(&heartbeat, b"active").map_err(|_| "Cannot update permission bridge")?;
+    }
     let mut pending = Vec::new();
     for entry in fs::read_dir(dir)
         .map_err(|_| "Cannot read permission mailbox")?
@@ -117,18 +127,26 @@ fn submit(dir: &Path, id: &str, behavior: &str, now: u64) -> Result<(), String> 
 }
 
 #[tauri::command]
-pub fn list_permission_requests() -> Result<Vec<PermissionRequest>, String> {
-    list_pending(&crate::paths::app_data_dir()?.join("permissions"), now_ms())
+pub async fn list_permission_requests() -> Result<Vec<PermissionRequest>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        list_pending(&crate::paths::app_data_dir()?.join("permissions"), now_ms())
+    })
+    .await
+    .map_err(|e| format!("Permission mailbox worker failed: {e}"))?
 }
 
 #[tauri::command]
-pub fn respond_to_permission(id: String, behavior: String) -> Result<(), String> {
-    submit(
-        &crate::paths::app_data_dir()?.join("permissions"),
-        &id,
-        &behavior,
-        now_ms(),
-    )
+pub async fn respond_to_permission(id: String, behavior: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        submit(
+            &crate::paths::app_data_dir()?.join("permissions"),
+            &id,
+            &behavior,
+            now_ms(),
+        )
+    })
+    .await
+    .map_err(|e| format!("Permission decision worker failed: {e}"))?
 }
 
 #[cfg(test)]

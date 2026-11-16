@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { ProviderIcon } from './ProviderIcon';
 import { relativeTime } from '../lib/format';
 import { isDesktop } from '../lib/desktop';
@@ -6,15 +6,19 @@ import { PROVIDER_NAMES } from '../lib/sessionSummary';
 import { lowQuotaWarnings, providerUsage, quotaState, usageAge, USAGE_PROVIDERS } from '../lib/usage';
 import type { Agent, UsageReadResult } from '../types';
 
-const money = (value: number) => new Intl.NumberFormat(undefined, {
+const moneyFormatter = new Intl.NumberFormat(undefined, {
   style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4,
-}).format(value);
+});
+const money = (value: number) => moneyFormatter.format(value);
 
-export function UsageOverview({ agents, result }: { agents: Agent[]; result: UsageReadResult }) {
+export const UsageOverview = memo(function UsageOverview({ agents, result }: { agents: Agent[]; result: UsageReadResult }) {
   const [alertsEnabled] = useState(() => {
     try { return typeof window !== 'undefined' && window.localStorage.getItem('stxic.halo.quotaAlerts') === 'true'; } catch { return false; }
   });
-  const lowQuotas = alertsEnabled ? lowQuotaWarnings(agents, result.reports) : [];
+  const lowQuotas = useMemo(
+    () => (alertsEnabled ? lowQuotaWarnings(agents, result.reports) : []),
+    [alertsEnabled, agents, result.reports]
+  );
   return <section className="usage-overview" aria-label="Provider usage and limits">
     <div className="section-heading"><h2>Usage &amp; limits</h2><span className="subtle-label">All providers</span></div>
     {lowQuotas.length > 0 && <div className="quota-warnings" role="status">{lowQuotas.map(({ provider, quota, remaining }) =>
@@ -24,7 +28,7 @@ export function UsageOverview({ agents, result }: { agents: Agent[]; result: Usa
 
     {result.errors.length > 0 && <p className="connection-error" role="alert">{result.errors.join(' ')}</p>}
   </section>;
-}
+});
 
 const missingReadings = {
   codex: { quota: 'No quota snapshot in the local Codex logs yet.', session: 'Start a Codex task with the log adapter enabled to receive token totals.' },
@@ -34,8 +38,8 @@ const missingReadings = {
   opencode: { quota: 'OpenCode does not publish account quota through this plugin. Check your model provider’s usage page.', session: 'Connect OpenCode in Settings, then finish a turn to publish tokens and reported cost.' },
 };
 
-function ProviderUsageSection({ provider, agents, result }: { provider: typeof USAGE_PROVIDERS[number]; agents: Agent[]; result: UsageReadResult }) {
-  const usage = providerUsage(provider, agents, result.reports);
+const ProviderUsageSection = memo(function ProviderUsageSection({ provider, agents, result }: { provider: typeof USAGE_PROVIDERS[number]; agents: Agent[]; result: UsageReadResult }) {
+  const usage = useMemo(() => providerUsage(provider, agents, result.reports), [provider, agents, result.reports]);
   const latest = usage.sessions[0];
   return <section className={`usage-provider ${usage.quotas.length ? 'has-limits' : 'no-limits'}`} aria-label={`${PROVIDER_NAMES[provider]} usage`}>
     <div className="usage-card-header"><span className="provider-label"><ProviderIcon provider={provider} /><strong>{PROVIDER_NAMES[provider]}</strong></span>
@@ -70,4 +74,4 @@ function ProviderUsageSection({ provider, agents, result }: { provider: typeof U
     <p className="usage-footnote">Session totals do not measure subscription allowance. Reported cost may differ from your bill.</p>
     </details>
   </section>;
-}
+});

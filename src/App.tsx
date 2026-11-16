@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity,
   ArrowLeft,
@@ -39,6 +39,8 @@ import type {
   Tab,
   UserSettings,
 } from './types';
+
+const EMPTY_WORKSPACES: readonly string[] = [];
 
 const TABS: Array<{ name: Tab; title: string; icon: typeof House }> = [
   { name: 'overview', title: 'Overview', icon: House },
@@ -592,13 +594,15 @@ export default function App() {
 
   const collapsedPillRef = useRef<HTMLButtonElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
   const permissions = usePermissions(!demo);
   const pendingPermission = permissions.requests[0];
   const hover = useMemo(() => createHoverDisclosure(
-    () => { if (!expanded) setPreview(true); },
+    () => { if (!expandedRef.current) setPreview(true); },
     () => setPreview(false),
     () => true, 65, 320,
-  ), [expanded, setPreview]);
+  ), [setPreview]);
   useEffect(() => () => hover.cancel(), [hover]);
   useEffect(() => {
     if (expanded) setPreview(false);
@@ -619,8 +623,31 @@ export default function App() {
   const sessions = useMemo(() => currentSessions(shownAgents), [shownAgents]);
   const activeWorking = useMemo(() => sessions.filter((a) => a.status === 'working').length, [sessions]);
   const leadWorkingAgent = sessions[0];
-  const previewAgent = useMemo(() => leadWorkingAgent ?? [...shownAgents].sort((a, b) => Date.parse(b.lastSeen) - Date.parse(a.lastSeen))[0], [leadWorkingAgent, shownAgents]);
+  const previewAgent = useMemo(() => {
+    if (leadWorkingAgent) return leadWorkingAgent;
+    let latest: Agent | undefined;
+    let latestMs = -Infinity;
+    for (const agent of shownAgents) {
+      const ms = Date.parse(agent.lastSeen) || 0;
+      if (!latest || ms > latestMs) {
+        latest = agent;
+        latestMs = ms;
+      }
+    }
+    return latest;
+  }, [leadWorkingAgent, shownAgents]);
   const budget = useMemo(() => contextBudget(previewAgent), [previewAgent]);
+  const overviewAlerts = useMemo(
+    () => (pendingPermission ? activeAlerts.filter(alert => alert.agent.id !== pendingPermission.session_id) : activeAlerts),
+    [activeAlerts, pendingPermission]
+  );
+  const handleReviewActivity = useCallback(() => openTab('activity'), [openTab]);
+  const handleConnectSettings = useCallback(() => openTab('settings'), [openTab]);
+  const handleWorkspaceSettings = useCallback((path: string) => {
+    setWorkspaceSetup(path);
+    openTab('settings');
+  }, [openTab]);
+  const handleClearEventsSync = useCallback(() => { void handleClearEvents(); }, [handleClearEvents]);
   const leadAlert = activeAlerts[0];
   const leadAttention = leadAlert?.agent;
   const failedCount = leadAttention?.proof?.testsFailed ?? 0;
@@ -804,10 +831,10 @@ export default function App() {
                   <Overview
                     usageResult={usageResult}
                     agents={shownAgents}
-                    alerts={activeAlerts.filter(alert => alert.agent.id !== pendingPermission?.session_id)}
-                    onReview={() => openTab('activity')}
+                    alerts={overviewAlerts}
+                    onReview={handleReviewActivity}
                     onAcknowledgeAlert={acknowledgeAlert}
-                    onConnect={() => openTab('settings')}
+                    onConnect={handleConnectSettings}
                     claudeHookStatus={claudeHookStatus}
                   />
                 )}
@@ -817,9 +844,9 @@ export default function App() {
                     events={shownEvents}
                     demo={demo}
                     onVerifyWorkspace={handleVerifyWorkspace}
-                    approvedWorkspaces={settings.approved_workspaces ?? []}
+                    approvedWorkspaces={settings.approved_workspaces ?? EMPTY_WORKSPACES}
                     checks={workspaceChecks}
-                    onWorkspaceSettings={(path) => { setWorkspaceSetup(path); openTab('settings'); }}
+                    onWorkspaceSettings={handleWorkspaceSettings}
                   />
                 )}
                 {tab === 'system' && (
@@ -843,7 +870,7 @@ export default function App() {
                     updateSettings={updateSettings}
                     monitors={monitors}
                     eventCount={shownEvents.length}
-                    onClearEvents={() => void handleClearEvents()}
+                    onClearEvents={handleClearEventsSync}
                     onApproveWorkspace={handleApproveWorkspace}
                     onRevokeWorkspace={handleRevokeWorkspace}
                     liveError={liveError}

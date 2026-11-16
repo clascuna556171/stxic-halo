@@ -1,5 +1,5 @@
 import { ProviderIcon } from './ProviderIcon';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity } from 'lucide-react';
 import { activityLabel, activityWorkspaces, checkSummary, filterActivity, recentActivity, workspaceIdentity } from '../lib/activity';
 import { ALLOWLISTED_TEST_PROFILES } from '../lib/proofOfWork';
@@ -20,7 +20,16 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
   onVerifyWorkspace: (path: string, runTests: boolean, profile?: string) => Promise<ProofSummary | null>;
   onWorkspaceSettings: (path: string) => void;
 }) {
-  const workspaces = activityWorkspaces(agents, events);
+  const workspaces = useMemo(() => activityWorkspaces(agents, events), [agents, events]);
+  const workspaceByKey = useMemo(
+    () => new Map(workspaces.map((w) => [w.key, w] as const)),
+    [workspaces]
+  );
+  const duplicateLabels = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const w of workspaces) counts.set(w.label, (counts.get(w.label) ?? 0) + 1);
+    return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([label]) => label));
+  }, [workspaces]);
   const [selection, setSelection] = useState('');
   const [checkSelection, setCheckSelection] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -33,9 +42,17 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [profiles, setProfiles] = useState<Record<string, string>>({});
   const running = useRef(false);
-  const selectedFilter = workspaces.find(workspace => workspace.key === selection);
-  const selected = workspaces.find(workspace => workspace.key === checkSelection);
-  const timeline = filterActivity(recentActivity(events, selectedFilter?.path, selectedFilter?.sessionIds), providerFilter, eventFilter);
+  const selectedFilter = selection ? workspaceByKey.get(selection) : undefined;
+  const selected = checkSelection ? workspaceByKey.get(checkSelection) : undefined;
+  const timeline = useMemo(
+    () =>
+      filterActivity(
+        recentActivity(events, selectedFilter?.path, selectedFilter?.sessionIds),
+        providerFilter,
+        eventFilter
+      ),
+    [events, selectedFilter, providerFilter, eventFilter]
+  );
   const activeFilters = Number(Boolean(selectedFilter)) + Number(providerFilter !== 'all') + Number(eventFilter !== 'all');
   const proof = selected ? checks[selected.key] ?? selected.proof : null;
   const summary = checkSummary(proof);
@@ -65,7 +82,7 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
     {filtersOpen && <div id="activity-filters" className="activity-filter-panel">
     <div className="activity-filters">
       <label>Project<select value={selectedFilter?.key ?? ''} onChange={event => { setSelection(event.target.value); setVisibleCount(6); }}>
-        <option value="">All projects</option>{workspaces.map(workspace => <option key={workspace.key} value={workspace.key}>{workspaces.filter(other => other.label === workspace.label).length > 1 ? workspace.path : workspace.label}</option>)}
+        <option value="">All projects</option>{workspaces.map(workspace => <option key={workspace.key} value={workspace.key}>{duplicateLabels.has(workspace.label) ? workspace.path : workspace.label}</option>)}
       </select></label>
       <label>Provider<select value={providerFilter} onChange={event => { setProviderFilter(event.target.value); setVisibleCount(6); }}>
         <option value="all">All providers</option>{Object.entries(PROVIDER_NAMES).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
@@ -80,7 +97,7 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
       <ol className="activity-timeline" aria-label="Recent activity, newest first">
         {timeline.slice(0, visibleCount).map((event, index) => <li key={`${event.source}:${event.session_id}:${event.timestamp}:${event.event}:${index}`}>
           <ProviderIcon provider={event.source in PROVIDER_NAMES ? event.source as Provider : 'other'} />
-          <div><strong>{activityLabel(event)}</strong><span>{PROVIDER_NAMES[event.source as Provider] ?? 'Agent'} · {event.cwd ? workspaces.find(w => w.key === workspaceIdentity(event.cwd!))?.label ?? 'Project unavailable' : 'Project unavailable'}</span>{(event.event === 'PermissionRequest' || event.event === 'Error') && <span className="activity-attention">Needs attention</span>}</div>
+          <div><strong>{activityLabel(event)}</strong><span>{PROVIDER_NAMES[event.source as Provider] ?? 'Agent'} · {event.cwd ? workspaceByKey.get(workspaceIdentity(event.cwd))?.label ?? 'Project unavailable' : 'Project unavailable'}</span>{(event.event === 'PermissionRequest' || event.event === 'Error') && <span className="activity-attention">Needs attention</span>}</div>
           <time dateTime={event.timestamp}>{demo ? 'Sample' : relativeTime(event.timestamp)}</time>
         </li>)}
       </ol>
@@ -96,7 +113,7 @@ export const ActivityView = memo(function ActivityView({ agents, events, demo, a
         <p>Choose a project to optionally check changed files or run tests.</p>
         <div className="activity-workspace-picker"><label htmlFor="activity-check-workspace">Project to check</label>
           <select id="activity-check-workspace" value={selected?.key ?? ''} onChange={event => setCheckSelection(event.target.value)}>
-            <option value="">Choose a project</option>{workspaces.map(workspace => <option key={workspace.key} value={workspace.key}>{workspaces.filter(other => other.label === workspace.label).length > 1 ? workspace.path : workspace.label}</option>)}
+            <option value="">Choose a project</option>{workspaces.map(workspace => <option key={workspace.key} value={workspace.key}>{duplicateLabels.has(workspace.label) ? workspace.path : workspace.label}</option>)}
           </select>{selected && <p className="activity-path" title={selected.path}>{selected.path}</p>}
         </div>
         {!selected ? <p>{workspaces.length ? 'Choose a project to see available checks.' : 'Projects appear here after an agent reports activity.'}</p> : <>

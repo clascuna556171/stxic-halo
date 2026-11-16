@@ -18,8 +18,7 @@ import {
   isDesktop,
   listMonitors,
   loadSettings,
-  readCodexEvents,
-  readCodexTelemetry,
+  readCodexSnapshot,
   readEvents,
   readIntegrationStatus,
   readMetrics,
@@ -321,27 +320,82 @@ export function useHaloRuntime() {
     };
   }, []);
 
+  const wasPreviewRef = useRef(false);
+  const collapseBoundsTimerRef = useRef<number | undefined>(undefined);
+
   // Keep native desktop window tightly fitted to capsule state & monitor DPI.
+  // When closing hover preview back to compact notch, allow CSS collapse transition
+  // (~220ms) to complete before shrinking the native window height.
   useEffect(() => {
+    if (collapseBoundsTimerRef.current !== undefined) {
+      window.clearTimeout(collapseBoundsTimerRef.current);
+      collapseBoundsTimerRef.current = undefined;
+    }
+
+    const closingPreviewOnly =
+      !expanded && !preview && wasPreviewRef.current && !settings.reduce_motion;
+    wasPreviewRef.current = preview;
+
+    if (closingPreviewOnly) {
+      collapseBoundsTimerRef.current = window.setTimeout(() => {
+        collapseBoundsTimerRef.current = undefined;
+        void fitIsland(false, settingsRef.current, false, false).catch(() => {
+          /* Browser preview or unavailable window API */
+        });
+      }, 220);
+      return () => {
+        if (collapseBoundsTimerRef.current !== undefined) {
+          window.clearTimeout(collapseBoundsTimerRef.current);
+          collapseBoundsTimerRef.current = undefined;
+        }
+      };
+    }
+
     void fitIsland(expanded, settings, false, preview).catch(() => {
       /* Browser preview or unavailable window API */
     });
   }, [
     expanded,
     preview,
+    settings.reduce_motion,
     settings.target_monitor_index,
     settings.horizontal_offset_px,
     settings.top_inset_px,
   ]);
 
-  // Re-fit window if monitor DPI scale factor or display geometry changes.
+  // Re-fit window only if monitor DPI scale factor or display geometry changes
+  // (ignoring self-triggered resize events from fitIsland transitions).
   useEffect(() => {
     if (!isDesktop()) return;
+    const readDisplayEnv = () => {
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+      const sx = typeof window !== 'undefined' ? window.screen?.width ?? 0 : 0;
+      const sy = typeof window !== 'undefined' ? window.screen?.height ?? 0 : 0;
+      return `${dpr.toFixed(2)}:${sx}x${sy}`;
+    };
+    let lastDisplayEnv = readDisplayEnv();
+    let resizeTimer: number | undefined;
     const onResize = () => {
-      void fitIsland(expandedRef.current, settingsRef.current, true, previewRef.current).catch(() => {});
+      if (resizeTimer !== undefined) {
+        window.clearTimeout(resizeTimer);
+      }
+      resizeTimer = window.setTimeout(() => {
+        resizeTimer = undefined;
+        const nextEnv = readDisplayEnv();
+        if (nextEnv === lastDisplayEnv) {
+          return;
+        }
+        lastDisplayEnv = nextEnv;
+        void fitIsland(expandedRef.current, settingsRef.current, true, previewRef.current).catch(() => {});
+      }, 120);
     };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      if (resizeTimer !== undefined) {
+        window.clearTimeout(resizeTimer);
+      }
+    };
   }, []);
 
   // Subscribe to native system tray recovery events.
@@ -372,18 +426,31 @@ export function useHaloRuntime() {
     };
   }, []);
 
-  // Subscribe to real-time push events from native background file watcher
+  const pollInFlightRef = useRef(false);
+  const queuedPollRef = useRef(false);
+  const lastPollEndedAtRef = useRef(0);
+
+  // Subscribe to real-time push events from native background file watcher (debounced to coalesce bursts)
   useEffect(() => {
     if (demo || !isDesktop()) return;
     let cleanup: (() => void) | undefined;
+    let debounceTimer: number | undefined;
     void subscribeEventsUpdated(() => {
-      // Immediate poll pass when events file changes on disk
-      void pollNow();
+      if (debounceTimer !== undefined) {
+        window.clearTimeout(debounceTimer);
+      }
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = undefined;
+        void pollNow();
+      }, 120);
     }).then((unlisten) => {
       cleanup = unlisten;
     });
     return () => {
       cleanup?.();
+      if (debounceTimer !== undefined) {
+        window.clearTimeout(debounceTimer);
+      }
     };
   }, [demo]);
 
@@ -444,9 +511,14 @@ export function useHaloRuntime() {
     }
   }, [settings.approved_workspaces]);
 
-  // Core polling execution engine with content-equality guards to eliminate state thrashing
+  // Core polling execution engine with single-flight coalescing and content-equality guards
   const executePoll = useCallback(async (tickCount = 0) => {
     if (demo || !isDesktop()) return;
+    if (pollInFlightRef.current) {
+      queuedPollRef.current = true;
+      return;
+    }
+    pollInFlightRef.current = true;
     try {
       const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
       const isExpanded = expandedRef.current;
@@ -454,16 +526,19 @@ export function useHaloRuntime() {
       const isSystemTabActive = isExpanded && currentTab === 'system';
 
       // Throttling sysinfo sampling when collapsed and idle to avoid waking the CPU to measure the CPU
-      const shouldSampleMetrics = isSystemTabActive || metricsRef.current === null || tickCount % 4 === 0;
+      const shouldSampleMetrics =
+        isSystemTabActive || metricsRef.current === null || (tickCount > 0 && tickCount % 4 === 0);
+      const codexEnabled = settingsRef.current.enable_codex_logs !== false;
 
-      const [nextMetrics, nextEvents, codexEvents, codexTelemetry, processSnapshot, usage] = await Promise.all([
+      const [nextMetrics, nextEvents, codexSnapshot, processSnapshot, usage] = await Promise.all([
         shouldSampleMetrics ? readMetrics() : Promise.resolve(metricsRef.current),
         readEvents(),
-        settingsRef.current.enable_codex_logs !== false ? readCodexEvents() : Promise.resolve([]),
-        settingsRef.current.enable_codex_logs !== false ? readCodexTelemetry() : Promise.resolve([]),
+        codexEnabled ? readCodexSnapshot() : Promise.resolve({ telemetry: [], events: [] }),
         readProcessLifecycle(),
         readUsageReports(),
       ]);
+      const codexEvents = codexSnapshot.events;
+      const codexTelemetry = codexSnapshot.telemetry;
 
       const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0;
       pollTimingsRef.current = appendPollTiming(pollTimingsRef.current, elapsed);
@@ -471,12 +546,12 @@ export function useHaloRuntime() {
         setPollTimings([...pollTimingsRef.current]);
       }
 
-      // Update metrics & metricsHistory
-      if (nextMetrics) {
+      // Update metrics & metricsHistory only when a fresh sample was actually taken
+      if (shouldSampleMetrics && nextMetrics) {
         metricsRef.current = nextMetrics;
         metricsHistoryRef.current = appendMetricsSample(metricsHistoryRef.current, nextMetrics);
         if (isSystemTabActive) {
-          setMetrics(nextMetrics);
+          setMetrics((prev) => (areMetricsEqual(prev, nextMetrics) ? prev : nextMetrics));
           setMetricsHistory(metricsHistoryRef.current);
         }
       }
@@ -525,6 +600,13 @@ export function useHaloRuntime() {
       setLiveError(null);
     } catch (error) {
       setLiveError(error instanceof Error ? error.message : String(error));
+    } finally {
+      pollInFlightRef.current = false;
+      lastPollEndedAtRef.current = Date.now();
+      if (queuedPollRef.current && !demo) {
+        queuedPollRef.current = false;
+        void executePoll(0);
+      }
     }
   }, [demo]);
 
@@ -535,18 +617,19 @@ export function useHaloRuntime() {
   // Synchronize system tab metrics and timings on-demand when user opens System tab
   useEffect(() => {
     if (expanded && tab === 'system') {
-      if (metricsRef.current && !areMetricsEqual(metrics, metricsRef.current)) {
-        setMetrics(metricsRef.current);
+      if (metricsRef.current) {
+        setMetrics((prev) => (areMetricsEqual(prev, metricsRef.current) ? prev : metricsRef.current));
       }
       setMetricsHistory(metricsHistoryRef.current);
       setPollTimings([...pollTimingsRef.current]);
     }
-  }, [expanded, tab, metrics]);
+  }, [expanded, tab]);
 
   // When expanding or previewing, defer the fast refresh slightly (~180ms)
   // so IPC work and state updates never contend with the initial window/CSS animation frames.
   useEffect(() => {
     if (!expanded && !preview) return;
+    if (Date.now() - lastPollEndedAtRef.current <= 400) return;
     const timerId = window.setTimeout(() => {
       void pollNow();
     }, 180);
