@@ -12,8 +12,34 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - run: npm install
+      - run: npm ci
       - run: npm test
       - run: npm run build
-  # Add verified Tauri Rust compilation and signed installer workflow separately.
+      # The Tauri crate embeds ../dist at compile time, so hand the build to the Rust job.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
+  rust:
+    needs: frontend
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: cargo-${{ runner.os }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+      # Includes the real PowerShell hook tests, which is why this runs on Windows.
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+  # Signed installer builds are intentionally not here.
   # Do not attach unreviewed unsigned executables to public releases.

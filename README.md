@@ -4,7 +4,7 @@
 
 STXIC Halo is a local-first **Windows 10/11 top-edge floating workspace companion** that monitors AI coding agent sessions (via opt-in local lifecycle hooks) and host CPU/RAM telemetry in a compact, non-intrusive HUD capsule.
 
-> **Status: v0.1 Foundation Ready.** The modular React/TypeScript frontend, extensible subsystem interfaces, persistent settings store, hardened PowerShell hook bridge, and modular Tauri 2 / Rust backend (`paths`, `telemetry`, `events`, `config`, `window` + system tray recovery) are implemented and unit-tested. Compiling the native `.exe`/`.msi` requires installing the Rust toolchain (`rustup`) on your Windows machine.
+> **Status: v0.1.0 pre-release.** Halo shows sessions, token/context usage and host CPU/RAM in a compact HUD. Provider hooks are opt-in (Claude Code, Antigravity, GitHub Copilot CLI, OpenCode), Codex is read from its local session logs, and Claude permission requests can be approved or denied from Halo. The React/TypeScript frontend and the Tauri 2 / Rust backend are unit-tested; see `PROJECT_STATUS.md` for current counts and what has not been re-verified. Compiling the native `.exe`/`.msi` requires installing the Rust toolchain (`rustup`) on your Windows machine.
 
 ## Architecture Overview
 

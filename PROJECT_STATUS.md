@@ -1,4 +1,6 @@
-# Project Status — 2026-10-26 (Updated v0.3.2 — Phase 3B Complete)
+# Project Status — 2026-11-18 (phase table from 2026-10-26; Phase 3B complete)
+
+> Version note: the phase labels (v0.2, v0.3.2) are roadmap names. `package.json`, `Cargo.toml` and `tauri.conf.json` all still say `0.1.0`.
 
 | Area | Status | Details |
 |---|---|---|
@@ -32,14 +34,17 @@
 | Alert deduplication & staleness | Implemented & verified | Deterministic alert keys allow acknowledging blocking alerts without repeated nag; flags working/waiting sessions older than `stale_minutes` |
 | Gaming FPS Telemetry | Behind interface (v0.3+) | Extensible PresentMon / DXGI contract registered; disabled to guarantee zero-intrusion anti-cheat safety |
 
-## Verification Summary (Current Workstation)
-- **Rust Toolchain:**
-  - `rustup` (`stable-x86_64-pc-windows-msvc`, `rustc 1.99.1`, `cargo 1.99.1`) verified.
-  - `cargo test`: 33 Rust unit tests passing (33/33) across `events`, `proof_of_work`, `telemetry`, `claude_manager`, `config`, `perf`, `window`, `codex`, `profiling`, and `diagnostics`.
-  - `cargo check`: Rust native crate compiles with 0 errors.
-- **Frontend & TypeScript:**
-  - `npm test` (`vitest run`): 9 test suites, 48 unit tests passing (`sessionReconciliation.test.ts`, `perfTiming.test.ts`, `claudeHook.test.ts`, `codexAdapter.test.ts`, `agentEvents.test.ts`, `windowBounds.test.ts`, `foundation.test.ts`, `proofOfWork.test.ts`, `leakProfiling.test.ts`).
-  - `npm run build` (`tsc --noEmit && vite build`): strict TypeScript typecheck and Vite production build (`dist/`) succeeded with 0 errors.
+## Verification Summary
+Counts below were re-run on 2026-11-18 at commit `cc0b32f`. The per-phase "verified" rows above are dated snapshots from 2026-10-26 and were not re-checked individually.
+- **Rust (`cargo test --manifest-path src-tauri/Cargo.toml`):** 52 passed, 0 failed. This includes real PowerShell hook tests, so it needs Windows.
+- **Frontend (`npm test`):** 19 test files, 96 tests passed.
+- **TypeScript (`npx tsc --noEmit`):** 0 errors.
+- **Not re-run:** `vite build`, `cargo check`, installer bundling (`desktop:build:store`) and the independent QA pass. The installer sizes and SHA256 values below are from 2026-10-26 and describe those builds, not the current source.
+- **CI:** `.github/workflows/ci.yml` runs `npm test` and `npm run build`, then `cargo check` and `cargo test` on `windows-latest`. This workflow has not yet run on GitHub.
+
+### Earlier snapshot (2026-10-26, v0.3.2 label)
+- Rust: 33 tests passing at that time; frontend: 9 suites, 48 tests. `rustc`/`cargo` 1.99.1.
+- `npm run build` and `cargo check` succeeded with 0 errors.
 - **Desktop Bundling & Packaging:**
   - `npm run desktop:build:store` verified on Windows:
     - NSIS setup executable: `STXIC Halo_0.1.0_x64-setup.exe` (208.82 MiB, SHA256 `CF8F0B2009E3C3ADCB70DA8D7A59010B665B513EF475AE06BE65DF86FD810C0D`).

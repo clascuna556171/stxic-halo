@@ -12,12 +12,12 @@
 - **Tech Stack**:
   - **Frontend**: React 18, TypeScript, Vite, Lucide Icons, Vanilla CSS (Apple Liquid Glass design tokens).
   - **Backend / Desktop Runtime**: Tauri v2, Rust 2021 edition, `sysinfo`, `windows-sys`, `serde`, `tokio`.
-  - **Testing**: Vitest (48 frontend tests) + Cargo test (33 native Rust tests). 100% passing.
+  - **Testing**: Vitest (96 frontend tests) + Cargo test (52 native Rust tests), all passing as of 2026-11-18.
 - **Design Standard**: Authentic Apple Human Interface Guidelines (HIG) & Liquid Glass (`rgba(12, 13, 16, 0.82)`, Gaussian blur `28px`, saturation `190%`, continuous squircles, sub-pixel specular top-rim lighting, and Apple spring physics `cubic-bezier(0.16, 1, 0.3, 1)`).
 
 ---
 
-## 2. Current State (What Is Already Shipped up to `eaf1560`)
+## 2. Current State (shipped up to `eaf1560`; later commits through `cc0b32f` add provider integrations, interactive permission approval, usage overview and perf work. See `CHANGELOG.md` and `PROJECT_STATUS.md`, and treat Track 1 below as partly done)
 
 1. **Window Engine & Top-Bezel Docking (`src-tauri/src/window.rs`, `src/lib/desktop.ts`)**:
    - Zero-inset flush docking (`top_inset_px: 0` allowed and defaulted; window pinned to physical monitor `Y: 0`).
