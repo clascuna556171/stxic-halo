@@ -12,7 +12,7 @@
 - **Tech Stack**:
   - **Frontend**: React 18, TypeScript, Vite, Lucide Icons, Vanilla CSS (Apple Liquid Glass design tokens).
   - **Backend / Desktop Runtime**: Tauri v2, Rust 2021 edition, `sysinfo`, `windows-sys`, `serde`, `tokio`.
-  - **Testing**: Vitest (96 frontend tests) + Cargo test (52 native Rust tests), all passing as of 2026-11-18.
+  - **Testing**: Vitest (104 frontend tests) + Cargo test (52 native Rust tests), all passing as of 2026-11-18.
 - **Design Standard**: Authentic Apple Human Interface Guidelines (HIG) & Liquid Glass (`rgba(12, 13, 16, 0.82)`, Gaussian blur `28px`, saturation `190%`, continuous squircles, sub-pixel specular top-rim lighting, and Apple spring physics `cubic-bezier(0.16, 1, 0.3, 1)`).
 
 ---

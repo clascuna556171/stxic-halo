@@ -37,7 +37,7 @@
 ## Verification Summary
 Counts below were re-run on 2026-11-18 at commit `cc0b32f`. The per-phase "verified" rows above are dated snapshots from 2026-10-26 and were not re-checked individually.
 - **Rust (`cargo test --manifest-path src-tauri/Cargo.toml`):** 52 passed, 0 failed. This includes real PowerShell hook tests, so it needs Windows.
-- **Frontend (`npm test`):** 19 test files, 96 tests passed.
+- **Frontend (`npm test`):** 20 test files, 104 tests passed.
 - **TypeScript (`npx tsc --noEmit`):** 0 errors.
 - **Not re-run:** `vite build`, `cargo check`, installer bundling (`desktop:build:store`) and the independent QA pass. The installer sizes and SHA256 values below are from 2026-10-26 and describe those builds, not the current source.
 - **CI:** `.github/workflows/ci.yml` runs `npm test` and `npm run build`, then `cargo check` and `cargo test` on `windows-latest`. This workflow has not yet run on GitHub.
