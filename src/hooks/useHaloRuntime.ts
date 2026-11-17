@@ -37,6 +37,7 @@ import { appendMetricsSample, EMPTY_METRICS_HISTORY } from '../lib/telemetryHist
 import { reconcileSessions } from '../lib/sessionReconciliation';
 import { applyWorkspaceChecks, workspaceIdentity } from '../lib/activity';
 import { appendPollTiming, summarizePollTimings } from '../lib/perfTiming';
+import { isIdle, nextPollInterval } from '../lib/pollCadence';
 import type {
   Agent,
   AgentEvent,
@@ -429,6 +430,8 @@ export function useHaloRuntime() {
   const pollInFlightRef = useRef(false);
   const queuedPollRef = useRef(false);
   const lastPollEndedAtRef = useRef(0);
+  // Set by the background polling timer; restarts it at the fast rate after a long idle wait.
+  const wakePollingRef = useRef<(() => void) | null>(null);
 
   // Subscribe to real-time push events from native background file watcher (debounced to coalesce bursts)
   useEffect(() => {
@@ -441,6 +444,7 @@ export function useHaloRuntime() {
       }
       debounceTimer = window.setTimeout(() => {
         debounceTimer = undefined;
+        wakePollingRef.current?.();
         void pollNow();
       }, 120);
     }).then((unlisten) => {
@@ -629,6 +633,7 @@ export function useHaloRuntime() {
   // so IPC work and state updates never contend with the initial window/CSS animation frames.
   useEffect(() => {
     if (!expanded && !preview) return;
+    wakePollingRef.current?.();
     if (Date.now() - lastPollEndedAtRef.current <= 400) return;
     const timerId = window.setTimeout(() => {
       void pollNow();
@@ -643,23 +648,35 @@ export function useHaloRuntime() {
     let inFlight = false;
     let tickCount = 0;
     let timerId: number | undefined;
+    let idleStreak = 0;
+
+    const cadenceInput = () => ({
+      activeRateMs: settingsRef.current.poll_interval_ms,
+      expanded: expandedRef.current || previewRef.current,
+      claudeProcesses: processLifecycleRef.current?.claude_processes ?? 0,
+      codexProcesses: processLifecycleRef.current?.codex_processes ?? 0,
+      agents: agentsRef.current,
+    });
 
     const scheduleNext = () => {
       if (disposed) return;
-      const isExpanded = expandedRef.current || previewRef.current;
-      const hasActiveProcesses =
-        (processLifecycleRef.current?.claude_processes ?? 0) > 0 ||
-        (processLifecycleRef.current?.codex_processes ?? 0) > 0;
-      const hasWorkingAgents = agentsRef.current.some((a) => a.status === 'working');
-
-      const activeRate = Math.max(1000, Math.min(15000, settingsRef.current.poll_interval_ms));
-      // In idle collapsed state, conserve CPU and disk I/O with an eco cadence (~6s)
-      const ecoRate = Math.max(5000, Math.min(15000, activeRate * 2.5));
-      const nextInterval = isExpanded || hasActiveProcesses || hasWorkingAgents ? activeRate : ecoRate;
-
+      if (timerId !== undefined) window.clearTimeout(timerId);
+      // Eco cadence when idle, deep sleep after a few idle polls, configured rate otherwise.
+      idleStreak = isIdle(cadenceInput()) ? idleStreak + 1 : 0;
       timerId = window.setTimeout(() => {
         void tick();
-      }, nextInterval);
+      }, nextPollInterval({ ...cadenceInput(), idleStreak }));
+    };
+
+    // A push event, expand or preview means a long pending wait is now stale: restart the timer at the fast rate.
+    wakePollingRef.current = () => {
+      if (disposed) return;
+      idleStreak = 0;
+      if (inFlight) return; // the running tick reschedules itself when it finishes
+      if (timerId !== undefined) window.clearTimeout(timerId);
+      timerId = window.setTimeout(() => {
+        void tick();
+      }, nextPollInterval({ ...cadenceInput(), idleStreak }));
     };
 
     const tick = async () => {
@@ -693,6 +710,7 @@ export function useHaloRuntime() {
 
     return () => {
       disposed = true;
+      wakePollingRef.current = null;
       if (timerId !== undefined) {
         window.clearTimeout(timerId);
       }
