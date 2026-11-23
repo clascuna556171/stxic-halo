@@ -596,7 +596,7 @@ export default function App() {
   const activeTabRef = useRef<HTMLButtonElement>(null);
   const expandedRef = useRef(expanded);
   expandedRef.current = expanded;
-  const permissions = usePermissions(!demo);
+  const permissions = usePermissions(!demo && Boolean(claudeHookStatus?.installed));
   const pendingPermission = permissions.requests[0];
   const hover = useMemo(() => createHoverDisclosure(
     () => { if (!expandedRef.current) setPreview(true); },

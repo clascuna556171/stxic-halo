@@ -1,5 +1,13 @@
+use crate::paths::ensure_app_data_dir;
 use serde::{Deserialize, Serialize};
-use std::{env, path::PathBuf, process::Command};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+use std::{fs, path::{Path, PathBuf}, process::Command};
+
+const MANAGE_CLAUDE_HOOK_SCRIPT: &str = include_str!("../../scripts/manage-claude-hook.ps1");
+const CLAUDE_HOOK_SCRIPT: &str = include_str!("../../scripts/claude-hook.ps1");
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClaudeHookStatus {
@@ -13,34 +21,25 @@ pub struct ClaudeHookStatus {
     pub message: String,
 }
 
+fn ensure_embedded_script(path: &Path, content: &str) -> Result<(), String> {
+    if fs::read_to_string(path).ok().as_deref() == Some(content) {
+        return Ok(());
+    }
+    fs::write(path, content)
+        .map_err(|e| format!("Could not write embedded script {}: {}", path.display(), e))
+}
+
 pub fn resolve_manager_script_path() -> Result<PathBuf, String> {
-    let candidates = [
-        PathBuf::from("scripts/manage-claude-hook.ps1"),
-        PathBuf::from("../scripts/manage-claude-hook.ps1"),
-    ];
+    let dir = ensure_app_data_dir()?.join("integrations");
+    fs::create_dir_all(&dir)
+        .map_err(|e| format!("Could not create integrations directory: {}", e))?;
 
-    for c in &candidates {
-        if c.exists() {
-            return std::fs::canonicalize(c)
-                .map_err(|e| format!("Cannot canonicalize path: {}", e));
-        }
-    }
+    let manager_path = dir.join("manage-claude-hook.ps1");
+    let hook_path = dir.join("claude-hook.ps1");
+    ensure_embedded_script(&manager_path, MANAGE_CLAUDE_HOOK_SCRIPT)?;
+    ensure_embedded_script(&hook_path, CLAUDE_HOOK_SCRIPT)?;
 
-    if let Ok(exe) = env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let direct = dir.join("scripts/manage-claude-hook.ps1");
-            if direct.exists() {
-                return Ok(direct);
-            }
-            let dev_ancestor = dir.join("../../../scripts/manage-claude-hook.ps1");
-            if dev_ancestor.exists() {
-                return std::fs::canonicalize(&dev_ancestor)
-                    .map_err(|e| format!("Cannot canonicalize path: {}", e));
-            }
-        }
-    }
-
-    Err("Could not find manage-claude-hook.ps1 in workspace".to_string())
+    Ok(manager_path)
 }
 
 pub fn execute_hook_manager(action: &str) -> Result<ClaudeHookStatus, String> {
@@ -49,17 +48,21 @@ pub fn execute_hook_manager(action: &str) -> Result<ClaudeHookStatus, String> {
         .to_str()
         .ok_or_else(|| "Invalid unicode in script path".to_string())?;
 
-    let output = Command::new("powershell.exe")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            script_str,
-            "-Action",
-            action,
-        ])
+    let mut command = Command::new("powershell.exe");
+    command.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        script_str,
+        "-Action",
+        action,
+    ]);
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let output = command
         .output()
         .map_err(|e| format!("Failed to spawn PowerShell manager: {}", e))?;
 
@@ -110,9 +113,11 @@ mod tests {
     #[test]
     fn test_script_path_resolution() {
         let res = resolve_manager_script_path();
-        assert!(res.is_ok(), "Expected manage-claude-hook.ps1 to be found");
+        assert!(res.is_ok(), "Expected embedded manage-claude-hook.ps1 to materialize");
         let path = res.unwrap();
         assert!(path.exists());
         assert!(path.ends_with("manage-claude-hook.ps1"));
+        let hook_sibling = path.parent().unwrap().join("claude-hook.ps1");
+        assert!(hook_sibling.exists(), "Expected sibling claude-hook.ps1 to materialize");
     }
 }

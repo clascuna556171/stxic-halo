@@ -430,11 +430,11 @@ pub fn run() {
         // Must be registered first: a second launch (e.g. Start menu click while Halo is
         // already running from login) focuses the existing capsule instead of stacking
         // a duplicate always-on-top window and duplicate watchers.
-        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show_and_focus_main(app);
             let _ = app.emit("halo://second-instance", ());
         }))
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![AUTOSTART_ARG]),

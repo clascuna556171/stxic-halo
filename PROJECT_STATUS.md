@@ -1,4 +1,4 @@
-# Project Status — 2026-11-18 (phase table from 2026-10-26; Phase 3B complete)
+# Project Status — 2026-11-23 (Phase 3B + v0.1.0 Pre-Release Hardening Complete)
 
 > Version note: the phase labels (v0.2, v0.3.2) are roadmap names. `package.json`, `Cargo.toml` and `tauri.conf.json` all still say `0.1.0`.
 
@@ -9,7 +9,7 @@
 | Phase 1: Bounded File Watcher | Completed & verified | `BoundedEventQueue` with strict FIFO eviction, truncation detection, 2 MiB auto-rotation, and `EventLogWatcher` background thread emitting `halo://events-updated` push events directly to the frontend. |
 | Phase 1: Session Reconciliation | Completed & verified | `reconcileSessions` cross-checks working/waiting sessions against running provider OS processes (`claude`, `codex`, runtime CLIs) using working directory matching; flags abnormal terminations as `EXITED` and active sessions as `ALIVE`. |
 | Phase 1: Startup & Single Instance | Completed & verified | `tauri-plugin-single-instance` focuses existing capsule on duplicate launches with accessible alert; `tauri-plugin-autostart` provides a 1-click toggle for Windows Run-key login startup. |
-| Phase 1: Settings Migration & Recovery | Completed & verified | Schema v2 forward migration with automatic backup (`settings.json.bak`), corrupt file quarantine (`settings.corrupt-<ts>.json`), and live integration status health reporting. |
+| Phase 1: Settings Migration & Recovery | Completed & verified | Schema v3 forward migration with automatic backup (`settings.json.bak`), corrupt file quarantine (`settings.corrupt-<ts>.json`), and live integration status health reporting. |
 | Phase 1: Performance Instrumentation | Completed & verified | Local `PerfRegistry` tracking operation timings (`metrics_sample`, `event_log_read`, etc.), Halo self-footprint (PID, RAM, CPU), and frontend round-trip IPC latency summary (avg & p95). |
 | Phase 2: Structured Git Diff & Provenance | Completed & verified | Native porcelain summary parser extracting Git branch, staged/modified/untracked breakdowns, and individual file status tags; records evidence age and execution provenance. |
 | Phase 2: Opt-in Test Runner Parsing | Completed & verified | Parses test execution output across vitest, cargo test, and pytest for accurate passed/failed/total counts and duration; strictly prevents fake verified badges without real passing runs. |
@@ -26,7 +26,7 @@
 | Modular React/TS architecture | Implemented & verified | Separated UI (`components/`), runtime controller (`hooks/useHaloRuntime.ts`), settings (`config/settings.ts`), adapters (`lib/agentEvents.ts`), and telemetry (`lib/telemetryHistory.ts`) |
 | Fault recovery (`ErrorBoundary`) | Implemented & verified | Catches render faults inside the floating island with one-click HUD reset |
 | Persistent user settings | Implemented & verified | Atomic JSON persistence in `%LOCALAPPDATA%\STXICHalo\settings.json` + `localStorage` mirror (poll cadence, monitor index, auto-collapse on blur, reduced motion, alert filters, approved workspaces, Codex logs toggle, process reconciliation) |
-| Tauri 2 Windows shell & tray | Implemented & verified | Modular `src-tauri/src/{paths,telemetry,events,config,window,proof_of_work,codex,claude_manager,perf,profiling,diagnostics,lib}.rs` with DPI-aware multi-monitor clamping, tight `460×78` collapsed bounds, and system tray recovery menu |
+| Tauri 2 Windows shell & tray | Implemented & verified | Modular `src-tauri/src/{paths,telemetry,events,config,window,proof_of_work,codex,claude_manager,perf,profiling,diagnostics,lib}.rs` with DPI-aware multi-monitor clamping, tight `340×38` collapsed / `340×112` preview / `460×564` expanded bounds, embedded Claude hook scripts, `CREATE_NO_WINDOW` subprocess spawning, and system tray recovery menu |
 | Low-overhead CPU/RAM/processes | Implemented & verified | Targeted `sysinfo` refresh (`CpuRefreshKind` + `MemoryRefreshKind`) with process count throttled to 10s intervals (`ProcessRefreshKind::nothing()`) |
 | Claude Code hook bridge | Hardened & verified | `scripts/claude-hook.ps1` with 2 MiB automatic rotation and 3-attempt shared-lock retry; Rust `EventLogReader` caches `(len, modified_ms)` to avoid redundant disk reads |
 | Proof-of-Work Verifier (v0.2) | Implemented & verified | Concrete `ProofOfWorkVerifierContract` in Rust (`proof_of_work.rs`) & TS (`proofOfWork.ts`) inspecting `git status --porcelain` and allowlisted test runners (`npm test`, `cargo test`, `pnpm test`, `yarn test`, `vitest run`, `pytest`) for user-approved workspaces |
@@ -35,12 +35,18 @@
 | Gaming FPS Telemetry | Behind interface (v0.3+) | Extensible PresentMon / DXGI contract registered; disabled to guarantee zero-intrusion anti-cheat safety |
 
 ## Verification Summary
-Counts below were re-run on 2026-11-18 at commit `cc0b32f`. The per-phase "verified" rows above are dated snapshots from 2026-10-26 and were not re-checked individually.
-- **Rust (`cargo test --manifest-path src-tauri/Cargo.toml`):** 52 passed, 0 failed. This includes real PowerShell hook tests, so it needs Windows.
-- **Frontend (`npm test`):** 21 test files, 110 tests passed.
-- **TypeScript (`npx tsc --noEmit`):** 0 errors.
-- **Not re-run:** `vite build`, `cargo check`, installer bundling (`desktop:build:store`) and the independent QA pass. The installer sizes and SHA256 values below are from 2026-10-26 and describe those builds, not the current source.
-- **CI:** `.github/workflows/ci.yml` runs `npm test` and `npm run build`, then `cargo check` and `cargo test` on `windows-latest`. This workflow has not yet run on GitHub.
+Counts below were verified on **2026-11-23** against the v0.1.0 pre-release working tree (based on `b6a7ddc` + standalone Claude hook embedding, `CREATE_NO_WINDOW`, permission polling gate, and mixed-DPI window ordering fixes).
+- **Rust (`cargo check` & `cargo test --manifest-path src-tauri/Cargo.toml`):** 52 passed, 0 failed, 0 warnings (includes real PowerShell hook tests on Windows).
+- **Frontend (`npm test`):** 21 test files, 110 tests passed, 0 failed.
+- **TypeScript & Vite (`npm run typecheck` & `npm run build`):** 0 errors, 0 warnings.
+- **Windows Release Build (`npm run desktop:build`):**
+  - `src-tauri/target/release/stxic-halo.exe` (3.87 MB, SHA256 `3B245F91BC443A648EC965204E35105C07B6E6498B2D6F1942320C202C586DD2`)
+  - `src-tauri/target/release/bundle/nsis/STXIC Halo_0.1.0_x64-setup.exe` (1.44 MB, SHA256 `56FA0FCC61F4ED4330316EBD724033505DF2D409F11A65B5F19213939CCA18ED`)
+  - `src-tauri/target/release/bundle/msi/STXIC Halo_0.1.0_x64_en-US.msi` (2.10 MB, SHA256 `CFAA5556D0C4A5EEAEA9AC5C01F7903431432E9A737165B9326EE0A9E1632BFB`)
+- **Independent Code Review:** `PASS WITH NOTES` (Blocker #1 and all Important findings fixed and re-verified).
+- **Live Windows 11 Desktop QA:** `PASS` — tested standalone `stxic-halo.exe` copied outside the dev repo (`1920x1080` at 125% DPI): collapsed capsule (`425×48`), hover preview (`425×140`), expanded HUD (`575×705`), all 4 tabs (`Overview`, `Activity`, `System`, `Settings`), zero bridge errors, `Esc` collapse, single-instance guard, and `6.92 MB` settled idle RAM (`0% CPU`, `avg 7.7ms` IPC).
+- **CI:** `.github/workflows/ci.yml` (`Halo CI`) runs `npm test`, `npm run build`, `cargo check`, and `cargo test` on `windows-latest` and passed on `origin/main` (`b6a7ddc`).
+- **Not yet run on current source:** Microsoft Store offline WebView2 bundle (`npm run desktop:build:store`), Authenticode code signing, and Partner Center / WACK certification.
 
 ### Earlier snapshot (2026-10-26, v0.3.2 label)
 - Rust: 33 tests passing at that time; frontend: 9 suites, 48 tests. `rustc`/`cargo` 1.99.1.

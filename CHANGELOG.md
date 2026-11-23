@@ -1,6 +1,22 @@
 # Changelog
 
-## Unreleased — 2026-10-27
+## 0.1.0 — Pre-Release (2026-11-23)
+
+### Release & Desktop Hardening
+- Embed `manage-claude-hook.ps1` and `claude-hook.ps1` directly into the Rust binary and materialize them into `%LOCALAPPDATA%\STXICHalo\integrations\`, so standalone `.exe` and NSIS/MSI installs work outside the dev repository.
+- Suppress console window flashes (`CREATE_NO_WINDOW`) when spawning PowerShell, Git, and allowlisted test runners from release GUI builds.
+- Gate permission mailbox polling on active Claude Code hook installation so idle/non-Claude setups respect deep-sleep backoff without background disk writes.
+- Position before resizing using target-monitor physical dimensions on mixed-DPI multi-monitor switches, and register `tauri-plugin-single-instance` first.
+- Add updated brand favicon and Tauri desktop icons.
+
+### Runtime Performance & UI
+- Offload heavy disk/polling Tauri commands to `spawn_blocking` and cache Codex/usage file metadata for smoother UI and lower CPU usage.
+- Add deep-sleep polling backoff when collapsed and idle, waking immediately on activity or expand.
+- Add smooth hover preview morphing (`340×38` collapsed → `340×112` preview → `460×564` expanded) and cross-project Activity feed with glanceable usage cards.
+- Add Claude status line setup, data retention controls, quota notifications, provider connection health, and activity filters.
+- Add Windows CI workflow (`Halo CI`) running Vitest, TypeScript, Vite build, `cargo check`, and `cargo test`.
+
+## Earlier Development Snapshots (2026-10-26 – 2026-10-27)
 
 - Show all five providers directly in Overview without a dropdown, with specific explanations for missing readings.
 - Read existing Copilot CLI usage checkpoints/shutdowns for cumulative token and premium-request totals without fabricating USD costs or subscription allowance.
@@ -28,5 +44,3 @@
 - React browser prototype and Tauri 2/Rust Windows desktop scaffold.
 - Demo agent flows, local CPU/RAM/process metrics command and Claude Code sanitized hook bridge.
 - Product, security, Microsoft Store and engineering planning documents.
-
-**Not a public release.**

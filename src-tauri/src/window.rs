@@ -1,5 +1,5 @@
 use serde::Serialize;
-use tauri::{LogicalSize, Manager, PhysicalPosition, Runtime, WebviewWindow};
+use tauri::{LogicalSize, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow};
 
 pub const ISLAND_WIDTH_LOGICAL: f64 = 460.0;
 pub const NOTCH_COLLAPSED_WIDTH_LOGICAL: f64 = 340.0;
@@ -217,16 +217,16 @@ pub fn apply_island_bounds_with_preview<R: Runtime>(
             return Ok(());
         }
 
-        if !size_matches {
-            window
-                .set_size(LogicalSize::new(logical_width, logical_height))
-                .map_err(|_| "Could not resize Halo window".to_string())?;
-        }
-
         if !pos_matches {
             window
                 .set_position(PhysicalPosition::new(x, y))
                 .map_err(|_| "Could not position Halo window".to_string())?;
+        }
+
+        if !size_matches {
+            window
+                .set_size(PhysicalSize::new(phys_w as u32, phys_h as u32))
+                .map_err(|_| "Could not resize Halo window".to_string())?;
         }
     } else {
         window

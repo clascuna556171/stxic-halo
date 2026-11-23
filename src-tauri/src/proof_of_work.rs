@@ -1,5 +1,7 @@
 use crate::config::UserSettings;
 use serde::{Deserialize, Serialize};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -8,6 +10,9 @@ use std::{
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::State;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct GitFileChange {
@@ -158,11 +163,16 @@ pub fn parse_git_status_porcelain_summary(output: &str) -> GitStatusSummary {
 }
 
 pub fn inspect_git_status(workspace_dir: &Path) -> Result<GitStatusSummary, String> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    command
         .arg("status")
         .arg("--porcelain=v1")
         .arg("-b")
-        .current_dir(workspace_dir)
+        .current_dir(workspace_dir);
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let output = command
         .output()
         .map_err(|e| format!("Failed to execute git status: {e}"))?;
 
@@ -346,9 +356,12 @@ pub fn run_allowlisted_test(
 ) -> Result<TestRunSummary, String> {
     let (prog, args) = profile.command_and_args();
     let start = Instant::now();
-    let output = Command::new(prog)
-        .args(args)
-        .current_dir(workspace_dir)
+    let mut command = Command::new(prog);
+    command.args(args).current_dir(workspace_dir);
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+
+    let output = command
         .output()
         .map_err(|e| format!("Failed to spawn test runner '{prog}': {e}"))?;
 

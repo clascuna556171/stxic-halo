@@ -14,7 +14,7 @@ STXIC Halo is a local-first **Windows 10/11 top-edge floating workspace companio
 | **Configuration Store** | `src/config/settings.ts` & `src-tauri/src/config.rs` | Validated, clamped user preferences persisted to `%LOCALAPPDATA%\STXICHalo\settings.json` (atomic write) and mirrored to `localStorage` |
 | **Agent Event Pipeline** | `src/lib/agentEvents.ts` & `src-tauri/src/events.rs` | Metadata-cached bounded 256 KiB JSONL tail reader, 2 MiB auto-rotation, session staleness detection, and deterministic alert deduplication |
 | **System Telemetry** | `src/lib/telemetryHistory.ts` & `src-tauri/src/telemetry.rs` | Targeted `sysinfo` CPU/RAM sampling with 10s throttled process count enumeration and a bounded 24-sample history ring buffer |
-| **Window & Tray Management** | `src/lib/desktop.ts` & `src-tauri/src/window.rs` | Frameless always-on-top capsule (`460×78` collapsed, `460×604` expanded), multi-monitor DPI positioning with off-screen clamping, and Windows system tray recovery menu |
+| **Window & Tray Management** | `src/lib/desktop.ts` & `src-tauri/src/window.rs` | Frameless always-on-top capsule (`340×38` collapsed, `340×112` hover preview, `460×564` expanded), multi-monitor DPI positioning with off-screen clamping, and Windows system tray recovery menu |
 | **Runtime Controller & UI** | `src/hooks/useHaloRuntime.ts`, `src/App.tsx`, `src/components/` | Single-flight background polling (paused when hidden), `React.memo` view isolation, keyboard navigation (`Escape`, `Alt+1..4`), and `ErrorBoundary` fault recovery |
 | **Claude Hook Bridge** | `scripts/claude-hook.ps1` | Opt-in PowerShell script with 2 MiB log rotation and 3-attempt shared-lock retry |
 
@@ -59,10 +59,11 @@ Antigravity, GitHub Copilot CLI, and OpenCode can be connected from **Settings �
 All five providers appear together in Overview. Codex reads logged quota snapshots; Copilot CLI reads recorded token/premium-request totals; OpenCode reports tokens/cost after its plugin is connected. Other missing metrics have an explanation and require a separate local usage source.
 See [provider setup, availability, and usage exports](docs/engineering/PROVIDER_INTEGRATIONS.md).
 
-1. Read `docs/engineering/CLAUDE_INTEGRATION.md`.
-2. Back up `%USERPROFILE%\.claude\settings.json` if present.
-3. Merge `scripts/claude-hooks.example.json` into your Claude settings using the **absolute path** to `scripts/claude-hook.ps1`.
-4. Start a Claude Code session; sanitized lifecycle events stream to `%LOCALAPPDATA%\STXICHalo\events.jsonl`.
+1. Open Halo → **Settings → Claude Code** and click **Enable (1-Click)** to install the embedded hook script into `%LOCALAPPDATA%\STXICHalo\integrations\` and update `%USERPROFILE%\.claude\settings.json` with an automatic `.halo-bak` rollback backup.
+2. Start a Claude Code session; sanitized lifecycle events stream to `%LOCALAPPDATA%\STXICHalo\events.jsonl`.
+3. For manual setup or rollback details, see [`docs/engineering/CLAUDE_INTEGRATION.md`](docs/engineering/CLAUDE_INTEGRATION.md).
+
+> **Note for GitHub Release installers:** Pre-release Windows installers are currently unsigned, so Windows SmartScreen may show a "Windows protected your PC" prompt on first run (**More info → Run anyway**).
 
 ## Security & Privacy Guarantees
 
