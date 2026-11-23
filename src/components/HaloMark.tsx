@@ -1,30 +1,40 @@
-import type { SVGProps } from 'react';
+import { useId, type SVGProps } from 'react';
 
 /**
- * STXIC Halo orbital reticle mark.
- * Concentric 96x96 geometry around (48, 48):
- * - Outer orbital arc: R=32, 312° span with 48° aperture centered at -30°
- * - Inner datum arc: R=19, 60° span across upper-left quadrant (195° to 255°)
- * - Sentinel node: R=5.25 seated at (75.71, 32.00) on the R=32 orbit
- * - Workspace core: R=8.5 centered at (48, 48)
+ * STXIC Halo brand mark (matches public/favicon.svg and src-tauri/icons/icon.png):
+ * Bold "H" monogram with a -24° tilted orbital ring and #FF6A1A sentinel dot.
  */
 export default function HaloMark({ size = 28, ...props }: SVGProps<SVGSVGElement> & { size?: number }) {
+  const clipId = useId();
   return (
-    <svg width={size} height={size} viewBox="0 0 96 96" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M 79.82 44.66 A 32 32 0 1 1 66.81 22.11"
-        stroke="currentColor"
-        strokeWidth="6.5"
-        strokeLinecap="round"
-      />
-      <path
-        d="M 29.65 43.08 A 19 19 0 0 1 43.08 29.65"
-        stroke="#B5F5CD"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-      />
-      <circle cx="75.71" cy="32" r="5.25" fill="#B5F5CD" />
-      <circle cx="48" cy="48" r="8.5" fill="currentColor" />
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true" {...props}>
+      <g transform="translate(20.36 73.25)">
+        <g transform="rotate(-24 29.64 -23.25)">
+          <ellipse cx="29.64" cy="-23.25" rx="46" ry="17" fill="none" stroke="currentColor" strokeWidth="6" />
+        </g>
+        <path
+          fill="currentColor"
+          d="M3.72 0L3.72-46.50L19.72-46.50L19.72-30.81L39.56-30.81L39.56-46.50L55.55-46.50L55.55 0L39.56 0L39.56-16.68L19.72-16.68L19.72 0L3.72 0Z"
+        />
+        <g transform="rotate(-24 29.64 -23.25)">
+          <clipPath id={clipId}>
+            <rect x="-30.36" y="-23.25" width="120" height="40" />
+          </clipPath>
+          <g clipPath={`url(#${clipId})`}>
+            <ellipse
+              cx="29.64"
+              cy="-23.25"
+              rx="46"
+              ry="17"
+              fill="none"
+              stroke="var(--surface, #0E0E0E)"
+              strokeWidth="16"
+            />
+            <ellipse cx="29.64" cy="-23.25" rx="46" ry="17" fill="none" stroke="currentColor" strokeWidth="6" />
+          </g>
+          <circle cx="54.49" cy="-8.94" r="5.5" fill="#FF6A1A" stroke="var(--surface, #0E0E0E)" strokeWidth="3" />
+        </g>
+      </g>
     </svg>
   );
 }
