@@ -1944,3 +1944,85 @@ html:has(.browser-help) .collapsed-pill {
   border-color: rgba(255, 255, 255, 0.12);
 }
 
+
+
+/* Circular % usage rings for active AI providers in the collapsed pill */
+.pill-rings {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pill-ring {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 3px;
+  border-radius: 999px;
+  border: 0.5px solid var(--liquid-glass-border);
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.pill-ring-svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.pill-ring-track {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.pill-ring--healthy .pill-ring-arc {
+  stroke: var(--indicator-active, #30d158);
+}
+
+.pill-ring--warning .pill-ring-arc {
+  stroke: var(--indicator-warning, #ff9f0a);
+}
+
+.pill-ring--critical .pill-ring-arc {
+  stroke: var(--indicator-error, #ff453a);
+}
+
+.pill-ring--unknown .pill-ring-arc {
+  stroke: var(--vibrancy-tertiary);
+}
+
+.pill-ring-value {
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--vibrancy-primary);
+  white-space: nowrap;
+}
+
+.pill-ring--unknown .pill-ring-value {
+  color: var(--vibrancy-secondary);
+  font-weight: 500;
+}
+
+.pill-ring-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.pill-ring-icon .provider-icon {
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  min-height: 13px;
+  border-radius: 3px;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.pill-ring-icon .provider-icon svg {
+  width: 12px;
+  height: 12px;
+}

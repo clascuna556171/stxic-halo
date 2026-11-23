@@ -18,6 +18,7 @@ import HaloMark from './components/HaloMark';
 import { Overview, SystemView } from './components/Dashboard';
 import { ProviderConnections } from './components/ProviderConnections';
 import { ProviderIcon } from './components/ProviderIcon';
+import { computeActiveProviderRings, PillUsageRings } from './components/PillUsageRings';
 import { ClaudeStatuslineSetup } from './components/ClaudeStatuslineSetup';
 import { DataControls } from './components/DataControls';
 import { useQuotaNotifications, QuotaNotificationSettings } from './components/QuotaNotifications';
@@ -637,6 +638,10 @@ export default function App() {
     return latest;
   }, [leadWorkingAgent, shownAgents]);
   const budget = useMemo(() => contextBudget(previewAgent), [previewAgent]);
+  const pillRings = useMemo(
+    () => computeActiveProviderRings(shownAgents, usageResult.reports),
+    [shownAgents, usageResult.reports],
+  );
   const overviewAlerts = useMemo(
     () => (pendingPermission ? activeAlerts.filter(alert => alert.agent.id !== pendingPermission.session_id) : activeAlerts),
     [activeAlerts, pendingPermission]
@@ -706,17 +711,36 @@ export default function App() {
               </span>
 
               <span className="notch-right">
-                <span
-                  className={`pill-telemetry tabular ${activeAlerts.length ? 'warning' : 'healthy'}`}
-                >
-                  {pendingPermission ? 'Review' : budget ? `${budget.percentRemaining}% left` : 'Local'}
-                </span>
+                {pendingPermission ? (
+                  <span className="pill-telemetry tabular warning">Review</span>
+                ) : pillRings.length > 0 ? (
+                  <PillUsageRings rings={pillRings} />
+                ) : (
+                  <span
+                    className={`pill-telemetry tabular ${activeAlerts.length ? 'warning' : 'healthy'}`}
+                  >
+                    {budget ? `${budget.percentRemaining}% left` : 'Local'}
+                  </span>
+                )}
                 <ChevronDown size={13} className="pill-chevron" />
               </span>
               </span>
               <span className="token-preview-body" aria-hidden={!preview}>
-                <span className="token-preview-value tabular">{budget ? `${budget.remaining.toLocaleString()} tokens left` : 'Token count unavailable'}</span>
-                <span className="token-preview-detail">{previewAgent ? `${previewAgent.workspace} · ` : ''}{budget ? `${leadWorkingAgent ? 'Context' : 'Last report'} · ${relativeTime(previewAgent!.lastSeen)}` : 'Waiting for provider data'}</span>
+                <span className="token-preview-value tabular">
+                  {budget
+                    ? `${budget.remaining.toLocaleString()} tokens left`
+                    : (pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null))
+                      ? (pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null))!.detail
+                      : 'Token count unavailable'}
+                </span>
+                <span className="token-preview-detail">
+                  {previewAgent ? `${previewAgent.workspace} · ` : ''}
+                  {budget
+                    ? `${leadWorkingAgent ? 'Context' : 'Last report'} · ${relativeTime(previewAgent!.lastSeen)}`
+                    : (pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null))
+                      ? 'Live provider usage'
+                      : 'Waiting for provider data'}
+                </span>
                 <span className="token-preview-hint">Click to open dashboard</span>
               </span>
             </button>
