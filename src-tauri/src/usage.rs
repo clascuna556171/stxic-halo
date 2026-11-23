@@ -2,8 +2,9 @@
 use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
+    env,
     fs::{self, File},
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
     time::SystemTime,
@@ -167,6 +168,107 @@ where F: FnOnce() -> (Vec<ProviderUsageReport>, Vec<String>) {
     }
 }
 
+fn read_antigravity_transcript_tail(path: &Path, session_id: &str) -> Option<SessionUsage> {
+    let mut file = File::open(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    let start = len.saturating_sub(131_072);
+    if start > 0 {
+        file.seek(SeekFrom::Start(start)).ok()?;
+    }
+    let mut buf = Vec::new();
+    file.take(131_072).read_to_end(&mut buf).ok()?;
+    let text = String::from_utf8_lossy(&buf);
+    for line in text.lines().rev() {
+        if !line.contains("input_tokens") && !line.contains("output_tokens") {
+            continue;
+        }
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let created_at = match val.get("created_at").and_then(|v| v.as_str()) {
+            Some(ts) if timestamp_shape(ts) => ts.to_string(),
+            _ => continue,
+        };
+        let input = val.get("input_tokens").and_then(|v| v.as_u64());
+        let cache_read = val.get("cache_read_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+        let output = val.get("output_tokens").and_then(|v| v.as_u64());
+        if input.is_none() && output.is_none() {
+            continue;
+        }
+        let total = input.unwrap_or(0).saturating_add(cache_read).saturating_add(output.unwrap_or(0));
+        return Some(SessionUsage {
+            session_id: session_id.to_string(),
+            total_tokens: Some(total),
+            cost_usd: None,
+            premium_requests: None,
+            observed_at: created_at,
+        });
+    }
+    None
+}
+
+fn append_antigravity_usage(
+    cache: &mut BTreeMap<(PathBuf, String), UsageCacheEntry>,
+    result: &mut UsageReadResult,
+) {
+    let Some(home) = env::var_os("USERPROFILE").or_else(|| env::var_os("HOME")).map(PathBuf::from) else {
+        return;
+    };
+    let brain_dir = home.join(".gemini").join("antigravity").join("brain");
+    let Ok(entries) = fs::read_dir(&brain_dir) else {
+        return;
+    };
+    let mut candidates = Vec::new();
+    for entry in entries.flatten().take(48) {
+        let name = entry.file_name().to_string_lossy().to_string();
+        if name.is_empty() || name.len() > 128 {
+            continue;
+        }
+        let transcript = entry.path().join(".system_generated").join("logs").join("transcript.jsonl");
+        if let Ok(meta) = fs::metadata(&transcript) {
+            if meta.is_file() {
+                candidates.push((transcript, name, meta.len(), meta.modified().ok()));
+            }
+        }
+    }
+    candidates.sort_by_key(|(_, _, _, modified)| std::cmp::Reverse(*modified));
+    let mut sessions = Vec::new();
+    for (path, session_id, len, modified) in candidates.into_iter().take(8) {
+        let key = (path.clone(), "antigravity".to_string());
+        if let Some((c_len, c_mod, cached)) = cache.get(&key) {
+            if *c_len == len && *c_mod == modified {
+                if let Ok(Some(report)) = cached {
+                    sessions.extend(report.sessions.clone());
+                }
+                continue;
+            }
+        }
+        let report_opt = read_antigravity_transcript_tail(&path, &session_id).map(|session| ProviderUsageReport {
+            schema_version: 1,
+            provider: "antigravity".to_string(),
+            sessions: vec![session],
+            quotas: Vec::new(),
+            source: Some(UsageSource::SessionLog),
+        });
+        if let Some(ref report) = report_opt {
+            sessions.extend(report.sessions.clone());
+        }
+        if cache.len() >= 128 && !cache.contains_key(&key) {
+            cache.clear();
+        }
+        cache.insert(key, (len, modified, Ok(report_opt)));
+    }
+    if !sessions.is_empty() {
+        result.reports.push(ProviderUsageReport {
+            schema_version: 1,
+            provider: "antigravity".to_string(),
+            sessions,
+            quotas: Vec::new(),
+            source: Some(UsageSource::SessionLog),
+        });
+    }
+}
+
 fn collect_usage_reports(read_copilot: bool) -> Result<UsageReadResult, String> {
     let root = crate::paths::app_data_dir()?.join("usage");
     let mut result = UsageReadResult::default();
@@ -182,6 +284,7 @@ fn collect_usage_reports(read_copilot: bool) -> Result<UsageReadResult, String> 
         }
     }
     append_copilot_usage(read_copilot, &mut result, crate::copilot_usage::read_local_usage);
+    append_antigravity_usage(&mut cache, &mut result);
     // One snapshot per OpenCode session prevents independent hosts overwriting
     // one another. Inspect at most 32 entries and read the newest 16 bounded files.
     collect_recent_json_reports(

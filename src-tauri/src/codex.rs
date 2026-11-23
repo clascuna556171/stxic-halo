@@ -4,7 +4,7 @@ use std::{
     collections::BTreeMap,
     env,
     fs::{self, File},
-    io::{BufRead, BufReader},
+    io::{BufRead, BufReader, Read},
     path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
     time::SystemTime,
@@ -74,7 +74,9 @@ fn collect_rollout_files(dir: &Path, acc: &mut Vec<(PathBuf, Option<SystemTime>)
         if entry.file_type().is_ok_and(|t| t.is_dir()) {
             collect_rollout_files(&path, acc);
         } else if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-            if name.starts_with("rollout-") && name.ends_with(".jsonl") {
+            if name.starts_with("rollout-")
+                && (name.ends_with(".jsonl") || name.ends_with(".jsonl.zst"))
+            {
                 let modified = entry.metadata().and_then(|m| m.modified()).ok();
                 acc.push((path, modified));
             }
@@ -87,7 +89,18 @@ fn collect_rollout_files(dir: &Path, acc: &mut Vec<(PathBuf, Option<SystemTime>)
 /// Extracts only: session_id, cwd, timestamp, event type, token counts, and context percentage.
 pub fn parse_rollout_file(path: &Path) -> Result<(CodexSessionTelemetry, Vec<AgentEvent>), String> {
     let file = File::open(path).map_err(|e| format!("Cannot open rollout file: {}", e))?;
-    let mut reader = BufReader::new(file);
+    let is_zst = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.ends_with(".zst"));
+    let boxed_reader: Box<dyn Read> = if is_zst {
+        let decoder = ruzstd::StreamingDecoder::new(file)
+            .map_err(|e| format!("Cannot decode zstd rollout file: {}", e))?;
+        Box::new(decoder)
+    } else {
+        Box::new(file)
+    };
+    let mut reader = BufReader::new(boxed_reader);
 
     let mut telemetry = CodexSessionTelemetry {
         status: "unknown".to_string(),
