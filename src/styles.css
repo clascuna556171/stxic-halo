@@ -22,9 +22,9 @@
 
   /* Apple Vibrancy Tiers (Contrast >= 7:1 primary, >= 4.5:1 secondary) */
   --vibrancy-primary: #ffffff;
-  --vibrancy-secondary: rgba(255, 255, 255, 0.68);
-  --vibrancy-tertiary: rgba(255, 255, 255, 0.44);
-  --vibrancy-quaternary: rgba(255, 255, 255, 0.22);
+  --vibrancy-secondary: rgba(255, 255, 255, 0.72);
+  --vibrancy-tertiary: rgba(255, 255, 255, 0.62);
+  --vibrancy-quaternary: rgba(255, 255, 255, 0.28);
 
   /* Semantic Hardware Accents (Restrained Apple System Colors — Zero Neon Slop) */
   --indicator-active: #30d158;
@@ -155,6 +155,7 @@ code {
 .app-frame.collapsed .island {
   max-width: 340px;
 }
+.app-frame.peek .island { max-width: 120px; }
 .app-frame.preview .island { max-width: 340px; }
 .app-frame.preview .browser-help { top: 128px; }
 .notch-summary { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 37px; flex-shrink: 0; }
@@ -327,6 +328,51 @@ code {
 
 .collapsed-pill.has-warning:hover {
   border-bottom-color: rgba(255, 159, 10, 0.42);
+}
+
+/* Auto-hidden thin top-edge peek strip (120px × 5px, flush y = 0) */
+.collapsed-pill.peek-bar {
+  width: 120px;
+  height: 5px;
+  min-height: 5px;
+  padding: 0;
+  border: none;
+  border-radius: 0 0 5px 5px;
+  background: rgba(12, 13, 17, 0.72);
+  justify-content: center;
+  align-items: center;
+  animation: none;
+}
+
+.collapsed-pill.peek-bar:hover {
+  background: rgba(18, 20, 26, 0.88);
+}
+
+.collapsed-pill.peek-bar:focus-visible {
+  outline: none;
+  box-shadow: inset 0 -2px 0 rgba(255, 255, 255, 0.85);
+}
+
+.peek-status-bar {
+  display: block;
+  width: 54px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--indicator-idle);
+  opacity: 0.55;
+  transition: background-color 200ms var(--spring-ease), opacity 200ms var(--spring-ease);
+}
+
+.peek-status-bar.working {
+  background: var(--indicator-active);
+  opacity: 0.95;
+  animation: ledBreathe 2.4s ease-in-out infinite;
+}
+
+.peek-status-bar.waiting,
+.peek-status-bar.warning {
+  background: var(--indicator-warning);
+  opacity: 0.98;
 }
 
 /* Left Hardware Cluster: 6px Breathing LED + Active Scope */
@@ -1330,6 +1376,8 @@ code {
 
 .mono-path {
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .integration-tag {

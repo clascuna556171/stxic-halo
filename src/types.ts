@@ -164,6 +164,7 @@ export interface UserSettings {
   horizontal_offset_px: number;
   top_inset_px: number;
   auto_collapse_on_blur: boolean;
+  auto_hide_on_maximized: boolean;
   reduce_motion: boolean;
   alert_on_waiting: boolean;
   alert_on_failure: boolean;

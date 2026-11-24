@@ -7,7 +7,7 @@ import type { UserSettings } from '../types';
 export const SETTINGS_STORAGE_KEY = 'stxic.halo.settings.v1';
 
 /** Keep in sync with `CURRENT_SCHEMA_VERSION` in `src-tauri/src/config.rs`. */
-export const CURRENT_SETTINGS_SCHEMA = 3;
+export const CURRENT_SETTINGS_SCHEMA = 4;
 
 export const DEFAULT_SETTINGS: UserSettings = {
   schema_version: CURRENT_SETTINGS_SCHEMA,
@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   horizontal_offset_px: 0,
   top_inset_px: 0,
   auto_collapse_on_blur: false,
+  auto_hide_on_maximized: true,
   reduce_motion: false,
   alert_on_waiting: true,
   alert_on_failure: true,
@@ -75,6 +76,7 @@ export function sanitizeSettings(raw?: Partial<UserSettings> | null): UserSettin
     horizontal_offset_px: clampInt(raw.horizontal_offset_px, -1600, 1600, DEFAULT_SETTINGS.horizontal_offset_px),
     top_inset_px: clampInt(raw.top_inset_px, 0, 64, DEFAULT_SETTINGS.top_inset_px),
     auto_collapse_on_blur: bool(raw.auto_collapse_on_blur, DEFAULT_SETTINGS.auto_collapse_on_blur),
+    auto_hide_on_maximized: bool(raw.auto_hide_on_maximized, DEFAULT_SETTINGS.auto_hide_on_maximized),
     reduce_motion: bool(raw.reduce_motion, DEFAULT_SETTINGS.reduce_motion),
     alert_on_waiting: bool(raw.alert_on_waiting, DEFAULT_SETTINGS.alert_on_waiting),
     alert_on_failure: bool(raw.alert_on_failure, DEFAULT_SETTINGS.alert_on_failure),

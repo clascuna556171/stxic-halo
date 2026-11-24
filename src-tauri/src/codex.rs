@@ -129,7 +129,7 @@ pub fn parse_rollout_file(path: &Path) -> Result<(CodexSessionTelemetry, Vec<Age
         let bytes = match reader.read_line(&mut line) {
             Ok(0) => break,
             Ok(n) => n,
-            Err(_) => continue,
+            Err(_) => break,
         };
         if bytes == 0 || line.trim().is_empty() {
             continue;

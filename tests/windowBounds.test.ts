@@ -5,6 +5,8 @@ import {
   ISLAND_EXPANDED_HEIGHT,
   ISLAND_WIDTH,
   NOTCH_COLLAPSED_WIDTH,
+  PEEK_HEIGHT,
+  PEEK_WIDTH,
 } from '../src/lib/desktop';
 
 describe('Window bounds & multi-monitor DPI scaling', () => {
@@ -87,5 +89,24 @@ describe('Window bounds & multi-monitor DPI scaling', () => {
 
     const insetTooLarge = calculatePhysicalBounds(false, monitor, { horizontal_offset_px: 0, top_inset_px: 999 });
     expect(insetTooLarge.y).toBe(64);
+  });
+
+  it('calculates flush top-edge peek bar (120x5) bounds and honors expanded/preview precedence', () => {
+    const monitor1080p = { x: 0, y: 0, width: 1920, height: 1080, scaleFactor: 1.0 };
+    const peek = calculatePhysicalBounds(false, monitor1080p, { horizontal_offset_px: 0, top_inset_px: 20 }, false, true);
+    expect(peek.width).toBe(PEEK_WIDTH);
+    expect(peek.height).toBe(PEEK_HEIGHT);
+    expect(peek.physicalWidth).toBe(120);
+    expect(peek.physicalHeight).toBe(5);
+    expect(peek.x).toBe(900);
+    expect(peek.y).toBe(0); // Flush top bezel regardless of top_inset_px
+
+    const previewWins = calculatePhysicalBounds(false, monitor1080p, { horizontal_offset_px: 0, top_inset_px: 0 }, true, true);
+    expect(previewWins.width).toBe(NOTCH_COLLAPSED_WIDTH);
+    expect(previewWins.height).toBe(112);
+
+    const expandedWins = calculatePhysicalBounds(true, monitor1080p, { horizontal_offset_px: 0, top_inset_px: 0 }, false, true);
+    expect(expandedWins.width).toBe(ISLAND_WIDTH);
+    expect(expandedWins.height).toBe(ISLAND_EXPANDED_HEIGHT);
   });
 });

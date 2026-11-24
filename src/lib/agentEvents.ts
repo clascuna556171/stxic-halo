@@ -269,7 +269,7 @@ export const notificationPolicy: NotificationPolicyContract = {
           : 'permission-waiting';
 
       const headline = hasTestFailure
-        ? `${agent.name} · ${failedCount} test${failedCount === 1 ? '' : 's'} failed in sample verification`
+        ? `${agent.name} · ${failedCount} test${failedCount === 1 ? '' : 's'} failed`
         : isError
           ? `${agent.name} · Session execution error`
           : `${agent.name} · Permission request waiting`;

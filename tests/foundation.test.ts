@@ -43,10 +43,12 @@ describe('settings persistence & sanitization', () => {
       ],
     };
     const sanitized = sanitizeSettings(raw as any);
-    expect(sanitized.schema_version).toBe(3);
+    expect(sanitized.schema_version).toBe(4);
     expect(sanitized.process_reconciliation).toBe(true);
     expect(sanitized.enable_copilot_usage_logs).toBe(false);
+    expect(sanitized.auto_hide_on_maximized).toBe(true);
     expect(sanitizeSettings({ enable_copilot_usage_logs: true }).enable_copilot_usage_logs).toBe(true);
+    expect(sanitizeSettings({ auto_hide_on_maximized: false }).auto_hide_on_maximized).toBe(false);
     expect(sanitized.approved_workspaces).toEqual(['C:\\Projects\\App', 'D:\\Other']);
   });
 });

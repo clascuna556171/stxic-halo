@@ -21,6 +21,7 @@ import {
   readCodexSnapshot,
   readEvents,
   readIntegrationStatus,
+  readMaximizedForeground,
   readMetrics,
   readPerformanceStats,
   readProcessLifecycle,
@@ -29,6 +30,7 @@ import {
   saveSettings,
   setLaunchAtLogin,
   subscribeEventsUpdated,
+  subscribeMaximizedForeground,
   subscribeTrayEvents,
 } from '../lib/desktop';
 import { reduceCodexSessions } from '../lib/codexAdapter';
@@ -225,6 +227,8 @@ export function areCodexTelemetryEqual(
 export function useHaloRuntime() {
   const [expanded, setExpanded] = useState(false);
   const [preview, setPreview] = useState(false);
+  const [peek, setPeek] = useState(false);
+  const [maximizedForeground, setMaximizedForeground] = useState(false);
   const [tab, setTab] = useState<Tab>('overview');
   const [demo, setDemo] = useState(false);
   const [settings, setSettings] = useState<UserSettings>(() => loadLocalSettings());
@@ -334,9 +338,31 @@ export function useHaloRuntime() {
   expandedRef.current = expanded;
   const previewRef = useRef(preview);
   previewRef.current = preview;
+  const peekRef = useRef(peek);
+  peekRef.current = peek;
 
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+
+  // Track Windows maximized foreground window state for auto-hide peek bar.
+  useEffect(() => {
+    if (!isDesktop()) return;
+    let active = true;
+    let cleanup: (() => void) | undefined;
+    void readMaximizedForeground().then((isMax) => {
+      if (active) setMaximizedForeground(isMax);
+    });
+    void subscribeMaximizedForeground((isMax) => {
+      if (active) setMaximizedForeground(isMax);
+    }).then((unlisten) => {
+      if (active) cleanup = unlisten;
+      else unlisten();
+    });
+    return () => {
+      active = false;
+      cleanup?.();
+    };
+  }, []);
 
   // Load persisted native settings and available monitors on startup.
   useEffect(() => {
@@ -355,40 +381,54 @@ export function useHaloRuntime() {
   const wasPreviewRef = useRef(false);
   const collapseBoundsTimerRef = useRef<number | undefined>(undefined);
 
+  useEffect(() => {
+    return () => {
+      if (collapseBoundsTimerRef.current !== undefined) {
+        window.clearTimeout(collapseBoundsTimerRef.current);
+        collapseBoundsTimerRef.current = undefined;
+      }
+    };
+  }, []);
+
   // Keep native desktop window tightly fitted to capsule state & monitor DPI.
-  // When closing hover preview back to compact notch, allow CSS collapse transition
+  // When closing hover preview back to compact notch or peek bar, allow CSS collapse transition
   // (~220ms) to complete before shrinking the native window height.
   useEffect(() => {
-    if (collapseBoundsTimerRef.current !== undefined) {
-      window.clearTimeout(collapseBoundsTimerRef.current);
-      collapseBoundsTimerRef.current = undefined;
-    }
-
     const closingPreviewOnly =
       !expanded && !preview && wasPreviewRef.current && !settings.reduce_motion;
     wasPreviewRef.current = preview;
 
     if (closingPreviewOnly) {
+      if (collapseBoundsTimerRef.current !== undefined) {
+        window.clearTimeout(collapseBoundsTimerRef.current);
+      }
       collapseBoundsTimerRef.current = window.setTimeout(() => {
         collapseBoundsTimerRef.current = undefined;
-        void fitIsland(false, settingsRef.current, false, false).catch(() => {
+        void fitIsland(false, settingsRef.current, false, false, peekRef.current).catch(() => {
           /* Browser preview or unavailable window API */
         });
       }, 220);
-      return () => {
-        if (collapseBoundsTimerRef.current !== undefined) {
-          window.clearTimeout(collapseBoundsTimerRef.current);
-          collapseBoundsTimerRef.current = undefined;
-        }
-      };
+      return;
     }
 
-    void fitIsland(expanded, settings, false, preview).catch(() => {
+    // If `preview` just closed and `peek` flipped on within the 220ms collapse grace window,
+    // wait for the in-flight CSS collapse timer instead of snapping mid-animation.
+    if (!expanded && !preview && peek && collapseBoundsTimerRef.current !== undefined) {
+      return;
+    }
+
+    if (collapseBoundsTimerRef.current !== undefined) {
+      window.clearTimeout(collapseBoundsTimerRef.current);
+      collapseBoundsTimerRef.current = undefined;
+    }
+
+    void fitIsland(expanded, settings, false, preview, peek).catch(() => {
       /* Browser preview or unavailable window API */
     });
   }, [
     expanded,
     preview,
+    peek,
     settings.reduce_motion,
     settings.target_monitor_index,
     settings.horizontal_offset_px,
@@ -418,7 +458,7 @@ export function useHaloRuntime() {
           return;
         }
         lastDisplayEnv = nextEnv;
-        void fitIsland(expandedRef.current, settingsRef.current, true, previewRef.current).catch(() => {});
+        void fitIsland(expandedRef.current, settingsRef.current, true, previewRef.current, peekRef.current).catch(() => {});
       }, 120);
     };
     window.addEventListener('resize', onResize);
@@ -438,14 +478,17 @@ export function useHaloRuntime() {
       onPositionReset: () => {
         setExpanded(false);
         setPreview(false);
-        setSettings((prev) =>
-          sanitizeSettings({
+        setPeek(false);
+        setSettings((prev) => {
+          const next = sanitizeSettings({
             ...prev,
             target_monitor_index: 0,
             horizontal_offset_px: 0,
             top_inset_px: 0,
-          })
-        );
+          });
+          void fitIsland(false, next, true, false, false).catch(() => {});
+          return next;
+        });
       },
       onSecondInstance: () => {
         setSecondInstancePing(Date.now());
@@ -911,6 +954,9 @@ export function useHaloRuntime() {
     setExpanded,
     preview,
     setPreview,
+    peek,
+    setPeek,
+    maximizedForeground,
     tab,
     setTab,
     openTab,

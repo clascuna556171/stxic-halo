@@ -113,17 +113,18 @@ fn save_settings(
     settings: UserSettings,
     expanded: bool,
 ) -> Result<UserSettings, String> {
-    let result = settings.save_to_disk();
-    if let Ok(mut h) = health.lock() {
-        h.last_save_error = result.as_ref().err().cloned();
-    }
-    let persisted = result?;
-    {
+    let persisted = {
         let mut guard = state
             .lock()
             .map_err(|_| "Settings store lock poisoned".to_string())?;
-        *guard = persisted.clone();
-    }
+        let result = settings.save_to_disk();
+        if let Ok(mut h) = health.lock() {
+            h.last_save_error = result.as_ref().err().cloned();
+        }
+        let next = result?;
+        *guard = next.clone();
+        next
+    };
     let _ = apply_island_bounds(
         &window,
         expanded,
@@ -145,19 +146,33 @@ fn sync_island_bounds(
     state: State<'_, Mutex<UserSettings>>,
     expanded: bool,
     preview: Option<bool>,
+    peek: Option<bool>,
 ) -> Result<(), String> {
     let settings = state
         .lock()
         .map(|s| s.clone())
         .unwrap_or_else(|_| UserSettings::default());
-    window::apply_island_bounds_with_preview(
+    window::apply_island_bounds_with_state(
         &window,
         expanded,
         preview.unwrap_or(false),
+        peek.unwrap_or(false),
         settings.target_monitor_index,
         settings.horizontal_offset_px,
         settings.top_inset_px,
     )
+}
+
+#[tauri::command]
+fn is_maximized_foreground(
+    window: WebviewWindow,
+    state: State<'_, Mutex<UserSettings>>,
+) -> bool {
+    let target_monitor_index = state
+        .lock()
+        .map(|s| s.target_monitor_index)
+        .unwrap_or(0);
+    window::is_foreground_maximized_for_window(&window, target_monitor_index)
 }
 
 /// Windows "start at login" state is read from the real Run-key entry, never cached in
@@ -384,7 +399,12 @@ fn setup_system_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>>
                         guard.target_monitor_index = 0;
                         guard.horizontal_offset_px = 0;
                         guard.top_inset_px = 0;
-                        let _ = guard.save_to_disk();
+                        let save_res = guard.save_to_disk();
+                        if let Some(health) = app.try_state::<Mutex<SettingsHealth>>() {
+                            if let Ok(mut h) = health.lock() {
+                                h.last_save_error = save_res.err();
+                            }
+                        }
                     }
                 }
                 if let Some(window) = app.get_webview_window("main") {
@@ -457,6 +477,9 @@ pub fn run() {
                 std::time::Duration::from_millis(250),
             );
 
+            // Watch Windows foreground window for maximized state (pushes halo://maximized-foreground)
+            window::start_maximized_foreground_watcher(app.handle().clone());
+
             if let Some(window) = app.get_webview_window("main") {
                 let _ = apply_island_bounds(
                     &window,
@@ -480,6 +503,7 @@ pub fn run() {
             save_settings,
             list_monitors,
             sync_island_bounds,
+            is_maximized_foreground,
             get_launch_at_login,
             set_launch_at_login,
             read_integration_status,

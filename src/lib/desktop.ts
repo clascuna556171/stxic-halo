@@ -30,6 +30,8 @@ export const ISLAND_WIDTH = 460;
 export const ISLAND_COLLAPSED_HEIGHT = 38;
 export const ISLAND_EXPANDED_HEIGHT = 564;
 export const ISLAND_PREVIEW_HEIGHT = 112;
+export const PEEK_WIDTH = 120;
+export const PEEK_HEIGHT = 5;
 
 export const isDesktop = (): boolean => isTauri();
 
@@ -226,15 +228,23 @@ export function calculatePhysicalBounds(
   expanded: boolean,
   monitor: { x: number; y: number; width: number; height: number; scaleFactor: number },
   settings: Pick<UserSettings, 'horizontal_offset_px' | 'top_inset_px'>,
-  preview = false
+  preview = false,
+  peek = false
 ): { x: number; y: number; width: number; height: number; physicalWidth: number; physicalHeight: number } {
-  const logicalWidth = expanded ? ISLAND_WIDTH : NOTCH_COLLAPSED_WIDTH;
-  const logicalHeight = expanded ? ISLAND_EXPANDED_HEIGHT : preview ? ISLAND_PREVIEW_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
+  const isPeek = !expanded && !preview && peek;
+  const logicalWidth = expanded ? ISLAND_WIDTH : isPeek ? PEEK_WIDTH : NOTCH_COLLAPSED_WIDTH;
+  const logicalHeight = expanded
+    ? ISLAND_EXPANDED_HEIGHT
+    : preview
+      ? ISLAND_PREVIEW_HEIGHT
+      : isPeek
+        ? PEEK_HEIGHT
+        : ISLAND_COLLAPSED_HEIGHT;
   const scale = Math.max(0.5, monitor.scaleFactor);
   const physicalWidth = Math.round(logicalWidth * scale);
   const physicalHeight = Math.round(logicalHeight * scale);
   const physicalOffsetX = Math.round(settings.horizontal_offset_px * scale);
-  const topInset = Math.round(Math.max(0, Math.min(64, settings.top_inset_px)) * scale);
+  const topInset = isPeek ? 0 : Math.round(Math.max(0, Math.min(64, settings.top_inset_px)) * scale);
 
   const rawX = monitor.x + Math.round((monitor.width - physicalWidth) / 2) + physicalOffsetX;
   const minX = monitor.x + 8;
@@ -250,35 +260,44 @@ export function calculatePhysicalBounds(
 }
 
 /**
- * Keeps the desktop window tightly fitted to the capsule in collapsed (340x38 notch) or expanded (460x564 island)
- * states so there is never an invisible desktop-wide click blocker, while honoring multi-monitor
- * selection, DPI scaling, and off-screen coordinate clamping.
+ * Keeps the desktop window tightly fitted to the capsule in peek (120x5), collapsed (340x38 notch),
+ * preview (340x112), or expanded (460x564 island) states so there is never an invisible desktop-wide
+ * click blocker, while honoring multi-monitor selection, DPI scaling, and off-screen coordinate clamping.
  */
 export async function fitIsland(
   expanded: boolean,
   settings: UserSettings = DEFAULT_SETTINGS,
   force = false,
-  preview = false
+  preview = false,
+  peek = false
 ): Promise<void> {
   if (!isTauri()) return;
 
+  const isPeek = !expanded && !preview && peek;
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-  const sig = `${expanded ? 'full' : preview ? 'preview' : 'compact'}:${settings.target_monitor_index}:${settings.horizontal_offset_px}:${settings.top_inset_px}:${dpr.toFixed(2)}`;
+  const mode = expanded ? 'full' : preview ? 'preview' : isPeek ? 'peek' : 'compact';
+  const sig = `${mode}:${settings.target_monitor_index}:${settings.horizontal_offset_px}:${settings.top_inset_px}:${dpr.toFixed(2)}`;
   if (!force && sig === lastBoundsSignature) {
     return;
   }
   lastBoundsSignature = sig;
 
   try {
-    await invoke('sync_island_bounds', { expanded, preview });
+    await invoke('sync_island_bounds', { expanded, preview, peek: isPeek });
     return;
   } catch {
     // Fallback to frontend window positioning if native command is unavailable.
   }
 
   const win = getCurrentWindow();
-  const width = expanded ? ISLAND_WIDTH : NOTCH_COLLAPSED_WIDTH;
-  const height = expanded ? ISLAND_EXPANDED_HEIGHT : preview ? ISLAND_PREVIEW_HEIGHT : ISLAND_COLLAPSED_HEIGHT;
+  const width = expanded ? ISLAND_WIDTH : isPeek ? PEEK_WIDTH : NOTCH_COLLAPSED_WIDTH;
+  const height = expanded
+    ? ISLAND_EXPANDED_HEIGHT
+    : preview
+      ? ISLAND_PREVIEW_HEIGHT
+      : isPeek
+        ? PEEK_HEIGHT
+        : ISLAND_COLLAPSED_HEIGHT;
   await win.setSize(new LogicalSize(width, height));
 
   const monitors = await availableMonitors().catch(() => []);
@@ -300,10 +319,35 @@ export async function fitIsland(
         scaleFactor: targetMonitor.scaleFactor,
       },
       settings,
-      preview
+      preview,
+      isPeek
     );
 
     await win.setPosition(new PhysicalPosition(x, y));
+  }
+}
+
+export async function readMaximizedForeground(): Promise<boolean> {
+  if (!isTauri()) return false;
+  try {
+    return await invoke<boolean>('is_maximized_foreground');
+  } catch {
+    return false;
+  }
+}
+
+export async function subscribeMaximizedForeground(
+  onChange: (maximized: boolean) => void
+): Promise<UnlistenFn> {
+  if (!isTauri()) {
+    return () => {};
+  }
+  try {
+    return await listen<boolean>('halo://maximized-foreground', (event) => {
+      onChange(Boolean(event.payload));
+    });
+  } catch {
+    return () => {};
   }
 }
 

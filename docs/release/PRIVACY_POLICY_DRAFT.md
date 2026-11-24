@@ -1,26 +1,38 @@
-# STXIC Halo — Privacy Policy (DRAFT — REVIEW BEFORE PUBLICATION)
+# STXIC Halo — Privacy Policy
 
-**Last edited:** 2026-10-25
+**Effective / Last updated:** 2026-11-24  
+**Publisher:** STXIC Labs (Individual Developer Account — Microsoft Partner Center Seller ID `97576040`)  
+**Contact:** `christianlascuna098@gmail.com`
 
-This draft describes the current local-first prototype. It is **not** a substitute for jurisdiction-specific legal advice. Replace missing company details and confirm shipping behavior before publishing any policy.
+STXIC Halo ("Halo") is a local-first Windows desktop companion for monitoring AI coding agent sessions, verification evidence, and system telemetry. All monitoring, parsing, and storage happen strictly on your Windows device.
 
-## 1. Information processed locally
-Halo's current Windows prototype reads CPU utilization, system memory statistics and process count on your computer. If you manually enable the Claude Code hook, Halo stores minimal local session metadata: session ID, event name, timestamp, tool name and working directory. Project paths and session metadata may reveal details about your work and should be treated as sensitive.
+## 1. Information processed locally on your device
+Depending on the features you enable, Halo reads or writes the following local data:
 
-## 2. What is not collected by this prototype
-The prototype does not request an account, analytics identity, source-code contents, prompts, model responses, clipboard or credential-store values. It does not upload system or hook data to a STXIC server. Preview-mode data is simulated and is not drawn from your computer.
+- **System & process telemetry:** Local CPU utilization, memory usage, process count, and running AI-agent process names/command-line indicators (to reconcile active sessions with live processes).
+- **Optional AI provider hooks & local session logs:**
+  - **Claude Code** (when you click Connect / Enable): Halo installs a local hook script and updates `%USERPROFILE%\.claude\settings.json` (saving backups before changes) and may read `%USERPROFILE%\.claude\projects\` or status-line quota metadata.
+  - **Claude Code permission requests (temporary mailbox):** When Claude Code hooks are active and an action requires approval, Halo temporarily writes `PermissionRequest` metadata—including `session_id`, `cwd`, `tool_name`, and `tool_input` (capped at 16 KiB, which may contain command arguments or file paths)—to `%LOCALAPPDATA%\STXICHalo\permissions\*.request.json`. Files expire after 45 seconds and are cleaned up automatically once resolved or expired.
+  - **Codex CLI** (enabled by default; toggleable in Settings): Reads local rollout logs and quota/token metadata from `%USERPROFILE%\.codex\sessions\`.
+  - **GitHub Copilot CLI / Antigravity / OpenCode** (when enabled or connected by you): Reads local session/usage metadata under `%USERPROFILE%\.copilot\`, `%USERPROFILE%\.gemini\antigravity\brain\`, or OpenCode data directories, and writes provider hook/plugin configurations when you explicitly connect them.
+- **User-approved workspace Proof-of-Work:** Only for workspace directories you explicitly approve, Halo runs local `git status` and allowlisted test commands (`npm test`, `cargo test`, `pnpm test`, `yarn test`, `vitest run`, `pytest`) to display diff summaries and pass/fail counts.
+- **Foreground window state:** When "Auto-hide on maximized windows" is enabled, Halo checks whether the active Windows foreground window is maximized and overlaps your selected monitor's top edge so Halo can tuck into a 5px peek bar without reading window contents or keystrokes.
 
-## 3. Storage and retention
-When enabled, Claude lifecycle metadata is stored in `%LOCALAPPDATA%\STXICHalo\events.jsonl`. The runtime automatically rotates the file when it exceeds 2 MiB, maintaining at most one backup file (`events.jsonl.bak`) to prevent disk bloat. In-memory event queues are capped at 250 items with FIFO eviction. You may clear events at any time from the Hooks view or remove the hook configuration.
+## 2. What Halo does NOT collect or transmit
+- Halo does **not** require an account, login, or subscription.
+- Halo does **not** transmit telemetry, analytics, crash reports, prompts, source code, tokens, or `tool_input` over the internet. Its Content Security Policy (`default-src 'self'; connect-src ipc: http://ipc.localhost`) blocks remote network requests from the UI.
+- Preview / Demo mode displays simulated data and does not read from your workspace or provider files.
 
-## 4. Permissions and your controls
-You choose whether to install the Claude Code hook. Halo does not modify Claude settings automatically. You can disconnect by removing Halo-specific hook entries and restarting Claude. You can enable Demo mode in Halo at any time.
+## 3. Local storage, retention & user controls
+- **App data directory:** Settings (`settings.json` + `settings.json.bak`), rotated hook event metadata (`events.jsonl` / `events.jsonl.bak`, capped at 2 MiB), and embedded integration scripts are stored locally under `%LOCALAPPDATA%\STXICHalo\`.
+- **Diagnostic bundles:** Clicking "Export Diagnostic Bundle" creates a local `support-bundle-*.json` file in `%LOCALAPPDATA%\STXICHalo\` containing settings health, timing stats, and approved workspace counts (no prompts, code, or credentials). Nothing is uploaded unless you manually share that file.
+- **Your controls:** You can toggle Codex/Copilot log readers, revoke approved workspaces, disconnect provider hooks (with backup restore), clear event logs, or run retention cleanup directly from Halo's Settings and Data Controls panels at any time.
 
-## 5. Third-party services
-Halo's first prototype does not integrate directly with online APIs or send account credentials to third parties. Claude Code itself is independently operated by its provider and subject to its own terms and policy. Future cloud features require a revised policy.
+## 4. Third-party tools
+Halo interoperates locally with third-party AI coding tools (such as Claude Code, Codex, GitHub Copilot CLI, OpenCode, and Antigravity) installed on your machine. Those tools are governed by their respective providers' terms and privacy policies.
 
-## 6. Support and contact
-**[REPLACE WITH VERIFIED STXIC LEGAL ENTITY AND SUPPORT EMAIL/WEBSITE]**. A contact and privacy-request process must be published before launch.
+## 5. Contact & Privacy Requests
+For support, questions, or privacy inquiries regarding STXIC Halo, contact **STXIC Labs** at **`christianlascuna098@gmail.com`**.
 
-## 7. Changes
-Any material changes to data processing, third-party services or telemetry require an updated policy and in-product notice/consent where applicable.
+## 6. Policy updates
+If future versions introduce any remote features, cloud sync, or optional telemetry, this Privacy Policy will be updated prior to release.

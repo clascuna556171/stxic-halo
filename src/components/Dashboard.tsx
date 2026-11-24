@@ -53,7 +53,7 @@ export const AttentionCard = memo(function AttentionCard({
           <span>{alert.reason === 'workspace-conflict' ? 'Workspace collision' : 'Action required'}</span>
         </div>
         <span className="attention-source tabular">
-          {agent.workspace} · {agent.isDemo ? 'fixture' : 'live hook'}
+          {agent.workspace} · {agent.isDemo ? 'demo' : 'live hook'}
         </span>
       </div>
       <div className="attention-body">
@@ -264,7 +264,7 @@ export const SystemView = memo(function SystemView({
               style={{
                 display: 'block',
                 marginTop: '4px',
-                color: perfStats.leak_analysis.suspected_leak ? '#cf222e' : 'var(--status-working, #3fb950)',
+                color: perfStats.leak_analysis.suspected_leak ? 'var(--indicator-error)' : 'var(--indicator-active)',
               }}
             >
               ✓ {perfStats.leak_analysis.status}

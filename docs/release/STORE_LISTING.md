@@ -11,7 +11,7 @@ STXIC Halo is a low-distraction, top-edge floating Windows companion designed fo
 Halo prioritizes truth-over-vibes: on-device data is never faked, unavailable metrics are honestly labelled, and zero prompt contents, code, or tokens leave your machine.
 
 ## Key Features
-- **Compact Floating Capsule:** Top-edge Windows HUD (460×78) with DPI-aware multi-monitor clamping, keyboard shortcuts (Alt+H, Alt+1..4, Esc), and tray icon recovery.
+- **Compact Floating Capsule:** Top-edge Windows HUD (340×38 collapsed notch, 460×564 expanded dashboard, and 120×5 auto-hide peek bar over maximized apps) with DPI-aware multi-monitor clamping, keyboard shortcuts (Alt+H, Alt+1..4, Esc), and tray icon recovery.
 - **Proof-of-Work & Evidence Inspector:** Inspect structured Git diff breakdowns (staged, modified, untracked) and opt-in test results (vitest, cargo test, pytest) for user-authorized workspaces.
 - **Multi-Session Collision Detection:** Real-time warnings when two active agent sessions edit intersecting workspace files.
 - **Agent Lifecycle Adapters:** 1-click Claude Code hook management with backup rollback, plus local Codex session rollout log reader.

@@ -347,6 +347,26 @@ const SettingsView = memo(function SettingsView({
       <div className="settings-card">
         <div className="setting-row">
           <div className="setting-description">
+            <strong>Auto-hide on maximized windows</strong>
+            <p>Tuck into a thin 5px top-edge status bar when a maximized app like Chrome is focused. Hover the top edge to reveal.</p>
+          </div>
+          <button
+            type="button"
+            className={`toggle ${settings.auto_hide_on_maximized ? 'on' : ''}`}
+            aria-label="Toggle auto-hide on maximized windows"
+            aria-pressed={settings.auto_hide_on_maximized}
+            onClick={() =>
+              updateSettings({ auto_hide_on_maximized: !settings.auto_hide_on_maximized })
+            }
+          >
+            <span />
+          </button>
+        </div>
+
+        <div className="setting-divider" />
+
+        <div className="setting-row">
+          <div className="setting-description">
             <strong>Auto-collapse on focus loss</strong>
             <p>Collapse back to the compact Dynamic Island notch when clicking into other apps.</p>
           </div>
@@ -551,6 +571,9 @@ export default function App() {
     setExpanded,
     preview,
     setPreview,
+    peek,
+    setPeek,
+    maximizedForeground,
     tab,
     setTab,
     openTab,
@@ -599,6 +622,20 @@ export default function App() {
   expandedRef.current = expanded;
   const permissions = usePermissions(!demo && Boolean(claudeHookStatus?.installed));
   const pendingPermission = permissions.requests[0];
+  const [peekHovered, setPeekHovered] = useState(false);
+  const peekHover = useMemo(
+    () =>
+      createHoverDisclosure(
+        () => setPeekHovered(true),
+        () => setPeekHovered(false),
+        () => true,
+        0,
+        380,
+      ),
+    [],
+  );
+  useEffect(() => () => peekHover.cancel(), [peekHover]);
+
   const hover = useMemo(() => createHoverDisclosure(
     () => { if (!expandedRef.current) setPreview(true); },
     () => setPreview(false),
@@ -606,20 +643,26 @@ export default function App() {
   ), [setPreview]);
   useEffect(() => () => hover.cancel(), [hover]);
   useEffect(() => {
-    if (expanded) setPreview(false);
-  }, [expanded, setPreview]);
+    if (expanded) {
+      setPreview(false);
+      setPeekHovered(false);
+      peekHover.cancel();
+    }
+  }, [expanded, setPreview, peekHover]);
 
   // Accessible focus retention: return focus to collapsed pill when closing,
-  // and focus the active tab when expanding.
+  // and focus the active tab when expanding or switching tabs.
   const wasExpandedRef = useRef(expanded);
+  const prevTabRef = useRef(tab);
   useEffect(() => {
     if (wasExpandedRef.current && !expanded) {
       collapsedPillRef.current?.focus();
-    } else if (!wasExpandedRef.current && expanded) {
+    } else if (expanded && (!wasExpandedRef.current || prevTabRef.current !== tab)) {
       activeTabRef.current?.focus();
     }
     wasExpandedRef.current = expanded;
-  }, [expanded]);
+    prevTabRef.current = tab;
+  }, [expanded, tab]);
 
   const sessions = useMemo(() => currentSessions(shownAgents), [shownAgents]);
   const activeWorking = useMemo(() => sessions.filter((a) => a.status === 'working').length, [sessions]);
@@ -657,7 +700,21 @@ export default function App() {
   const leadAttention = leadAlert?.agent;
   const failedCount = leadAttention?.proof?.testsFailed ?? 0;
 
-  const ledStatusClass = pendingPermission || activeAlerts.length > 0
+  const hasUrgentAlert = Boolean(pendingPermission) || activeAlerts.length > 0;
+  const shouldPeek = Boolean(
+    settings.auto_hide_on_maximized &&
+    maximizedForeground &&
+    !expanded &&
+    !preview &&
+    !peekHovered &&
+    !hasUrgentAlert
+  );
+
+  useEffect(() => {
+    setPeek(shouldPeek);
+  }, [shouldPeek, setPeek]);
+
+  const ledStatusClass = hasUrgentAlert
     ? 'waiting'
     : activeWorking > 0
       ? 'working'
@@ -681,24 +738,44 @@ export default function App() {
   return (
     <ErrorBoundary onReset={() => setExpanded(false)}>
       <div
-        className={`app-frame ${expanded ? 'expanded' : preview ? 'preview' : 'collapsed'} ${settings.reduce_motion ? 'reduce-motion' : ''}`}
+        className={`app-frame ${expanded ? 'expanded' : preview ? 'preview' : peek ? 'peek' : 'collapsed'} ${settings.reduce_motion ? 'reduce-motion' : ''}`}
       >
         <div className="sr-only" aria-live="polite" aria-atomic="true">
           {secondInstancePing ? 'STXIC Halo instance already running; focused floating console.' : ''}
         </div>
         <div className="island" role="region" aria-label="STXIC Halo floating monitor"
-          onPointerEnter={(event) => { if (event.pointerType !== 'touch') hover.enter(); }}
-          onPointerLeave={() => hover.leave()}
+          onPointerEnter={(event) => {
+            if (event.pointerType !== 'touch') {
+              peekHover.enter();
+              hover.enter();
+            }
+          }}
+          onPointerLeave={() => {
+            hover.leave();
+            peekHover.leave();
+          }}
+          onFocus={() => {
+            peekHover.enter();
+          }}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              peekHover.leave();
+            }
+          }}
         >
           {!expanded ? (
             <button
               ref={collapsedPillRef}
               type="button"
-              className={`collapsed-pill ${preview ? 'token-preview' : ''} ${pendingPermission || activeAlerts.length ? 'has-warning' : ''} ${isFloatingBezel ? 'floating-bezel' : ''}`}
-              onClick={() => { hover.cancel(); setPreview(false); setExpanded(true); }}
+              className={`collapsed-pill ${peek ? 'peek-bar' : ''} ${preview ? 'token-preview' : ''} ${hasUrgentAlert ? 'has-warning' : ''} ${isFloatingBezel && !peek ? 'floating-bezel' : ''}`}
+              onClick={() => { hover.cancel(); peekHover.cancel(); setPreview(false); setPeekHovered(false); setExpanded(true); }}
               aria-expanded={false}
-              aria-label="Open Halo dashboard"
+              aria-label={peek ? 'Reveal Halo status bar' : 'Open Halo dashboard'}
             >
+              {peek ? (
+                <span className={`peek-status-bar ${ledStatusClass}`} aria-hidden="true" />
+              ) : (
+                <>
               {(() => {
                 const hasFlankingRings = !pendingPermission && pillRings.length >= 2;
                 if (hasFlankingRings) {
@@ -800,6 +877,8 @@ export default function App() {
                 })()}
                 <span className="token-preview-hint">Click to open dashboard</span>
               </span>
+                </>
+              )}
             </button>
           ) : (
             <div className={`expanded-card ${isFloatingBezel ? 'floating-bezel' : ''}`}>
@@ -984,7 +1063,7 @@ export default function App() {
         {!isDesktop() && !expanded && (
           <div className="browser-help">
             <PanelTop size={15} />
-            <span>Hover for tokens. Click for the full dashboard.</span>
+            <span>Hover for quota. Click for the full dashboard.</span>
           </div>
         )}
         {!isDesktop() && expanded && (

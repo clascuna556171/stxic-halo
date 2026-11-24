@@ -14,7 +14,8 @@ use std::{
 /// - v2: adds `process_reconciliation`; normalizes and de-duplicates approved workspaces
 ///   case-insensitively (v1 `dedup()` only removed consecutive duplicates).
 /// - v3: adds an opt-in Copilot session usage reader.
-pub const CURRENT_SCHEMA_VERSION: u32 = 3;
+/// - v4: adds `auto_hide_on_maximized` (default on) so maximized apps like Chrome keep their top tabs unobstructed.
+pub const CURRENT_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -25,6 +26,7 @@ pub struct UserSettings {
     pub horizontal_offset_px: i32,
     pub top_inset_px: i32,
     pub auto_collapse_on_blur: bool,
+    pub auto_hide_on_maximized: bool,
     pub reduce_motion: bool,
     pub alert_on_waiting: bool,
     pub alert_on_failure: bool,
@@ -45,6 +47,7 @@ impl Default for UserSettings {
             horizontal_offset_px: 0,
             top_inset_px: 0,
             auto_collapse_on_blur: false,
+            auto_hide_on_maximized: true,
             reduce_motion: false,
             alert_on_waiting: true,
             alert_on_failure: true,
@@ -124,7 +127,7 @@ pub fn migrate_value(mut value: Value) -> Result<(Value, u32), String> {
     let from = obj
         .get("schema_version")
         .and_then(Value::as_u64)
-        .map(|v| v as u32)
+        .map(|v| v.min(u64::from(u32::MAX)) as u32)
         .unwrap_or(1)
         .max(1);
 
@@ -144,6 +147,10 @@ pub fn migrate_value(mut value: Value) -> Result<(Value, u32), String> {
     if version == 2 {
         obj.entry("enable_copilot_usage_logs").or_insert(Value::Bool(false));
         version = 3;
+    }
+    if version == 3 {
+        obj.entry("auto_hide_on_maximized").or_insert(Value::Bool(true));
+        version = 4;
     }
     // Future versions are read best-effort: unknown keys are ignored by serde.
     obj.insert(
@@ -206,6 +213,17 @@ impl UserSettings {
         };
 
         if !path.exists() {
+            if let Ok((settings, from)) = fs::read_to_string(backup)
+                .map_err(|e| e.to_string())
+                .and_then(|c| parse_settings(&c))
+            {
+                health.source = SettingsSource::Backup;
+                health.migrated_from = (from < CURRENT_SCHEMA_VERSION).then_some(from);
+                health.warning = Some(
+                    "Settings file was missing; restored last known good backup".to_string(),
+                );
+                return (settings, health);
+            }
             return (Self::default(), health);
         }
 
@@ -260,7 +278,12 @@ impl UserSettings {
         let dir = ensure_app_data_dir()?;
         let path = settings_file_path()?;
         let backup = settings_backup_path()?;
-        self.save_to_paths(&dir.join("settings.json.tmp"), &path, &backup)
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default();
+        let tmp = dir.join(format!("settings.json.{}-{}.tmp", std::process::id(), nanos));
+        self.save_to_paths(&tmp, &path, &backup)
     }
 
     /// Atomic save: write temp file, keep the current valid file as last-known-good backup,
@@ -321,11 +344,15 @@ mod tests {
     fn migrates_v2_without_enabling_copilot_log_access() {
         let (settings, from) = parse_settings(r#"{ "schema_version": 2, "enable_codex_logs": false }"#).unwrap();
         assert_eq!(from, 2);
-        assert_eq!(settings.schema_version, 3);
+        assert_eq!(settings.schema_version, CURRENT_SCHEMA_VERSION);
         assert!(!settings.enable_copilot_usage_logs);
         assert!(!settings.enable_codex_logs);
+        assert!(settings.auto_hide_on_maximized);
         let (enabled, _) = parse_settings(r#"{ "schema_version": 3, "enable_copilot_usage_logs": true }"#).unwrap();
         assert!(enabled.enable_copilot_usage_logs);
+        assert!(enabled.auto_hide_on_maximized);
+        let (disabled, _) = parse_settings(r#"{ "schema_version": 4, "auto_hide_on_maximized": false }"#).unwrap();
+        assert!(!disabled.auto_hide_on_maximized);
     }
 
     #[test]

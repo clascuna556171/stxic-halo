@@ -1,5 +1,7 @@
+use crate::config::UserSettings;
 use serde::Serialize;
-use tauri::{LogicalSize, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow};
+use std::sync::Mutex;
+use tauri::{Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow};
 
 pub const ISLAND_WIDTH_LOGICAL: f64 = 460.0;
 pub const NOTCH_COLLAPSED_WIDTH_LOGICAL: f64 = 340.0;
@@ -7,6 +9,8 @@ pub const NOTCH_COLLAPSED_HEIGHT_LOGICAL: f64 = 38.0;
 pub const ISLAND_COLLAPSED_HEIGHT_LOGICAL: f64 = NOTCH_COLLAPSED_HEIGHT_LOGICAL;
 pub const ISLAND_EXPANDED_HEIGHT_LOGICAL: f64 = 564.0;
 pub const ISLAND_PREVIEW_HEIGHT_LOGICAL: f64 = 112.0;
+pub const PEEK_WIDTH_LOGICAL: f64 = 120.0;
+pub const PEEK_HEIGHT_LOGICAL: f64 = 5.0;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MonitorDescriptor {
@@ -106,9 +110,38 @@ pub fn calculate_clamped_bounds_with_preview(
     horizontal_offset_px: i32,
     top_inset_px: i32,
 ) -> (i32, i32, i32, i32) {
+    calculate_clamped_bounds_with_state(
+        expanded,
+        preview,
+        false,
+        scale_factor,
+        mon_x,
+        mon_y,
+        mon_width,
+        mon_height,
+        horizontal_offset_px,
+        top_inset_px,
+    )
+}
+
+pub fn calculate_clamped_bounds_with_state(
+    expanded: bool,
+    preview: bool,
+    peek: bool,
+    scale_factor: f64,
+    mon_x: i32,
+    mon_y: i32,
+    mon_width: u32,
+    mon_height: u32,
+    horizontal_offset_px: i32,
+    top_inset_px: i32,
+) -> (i32, i32, i32, i32) {
     let scale = scale_factor.max(0.5);
+    let is_peek = !expanded && !preview && peek;
     let logical_width = if expanded {
         ISLAND_WIDTH_LOGICAL
+    } else if is_peek {
+        PEEK_WIDTH_LOGICAL
     } else {
         NOTCH_COLLAPSED_WIDTH_LOGICAL
     };
@@ -116,6 +149,8 @@ pub fn calculate_clamped_bounds_with_preview(
         ISLAND_EXPANDED_HEIGHT_LOGICAL
     } else if preview {
         ISLAND_PREVIEW_HEIGHT_LOGICAL
+    } else if is_peek {
+        PEEK_HEIGHT_LOGICAL
     } else {
         NOTCH_COLLAPSED_HEIGHT_LOGICAL
     };
@@ -123,8 +158,12 @@ pub fn calculate_clamped_bounds_with_preview(
     let physical_width = (logical_width * scale).round() as i32;
     let physical_height = (logical_height * scale).round() as i32;
     let physical_offset_x = (f64::from(horizontal_offset_px) * scale).round() as i32;
-    // Allow top_inset_px = 0 for flush top-bezel Mac Notch docking
-    let physical_top_inset = (f64::from(top_inset_px.clamp(0, 64)) * scale).round() as i32;
+    // Peek mode always docks flush at y = mon_y so it never dips into a maximized window's tab strip.
+    let physical_top_inset = if is_peek {
+        0
+    } else {
+        (f64::from(top_inset_px.clamp(0, 64)) * scale).round() as i32
+    };
 
     let centered_x = mon_x + ((mon_width as i32 - physical_width) / 2) + physical_offset_x;
     let min_x = mon_x + 8;
@@ -166,8 +205,31 @@ pub fn apply_island_bounds_with_preview<R: Runtime>(
     horizontal_offset_px: i32,
     top_inset_px: i32,
 ) -> Result<(), String> {
+    apply_island_bounds_with_state(
+        window,
+        expanded,
+        preview,
+        false,
+        target_monitor_index,
+        horizontal_offset_px,
+        top_inset_px,
+    )
+}
+
+pub fn apply_island_bounds_with_state<R: Runtime>(
+    window: &WebviewWindow<R>,
+    expanded: bool,
+    preview: bool,
+    peek: bool,
+    target_monitor_index: usize,
+    horizontal_offset_px: i32,
+    top_inset_px: i32,
+) -> Result<(), String> {
+    let is_peek = !expanded && !preview && peek;
     let logical_width = if expanded {
         ISLAND_WIDTH_LOGICAL
+    } else if is_peek {
+        PEEK_WIDTH_LOGICAL
     } else {
         NOTCH_COLLAPSED_WIDTH_LOGICAL
     };
@@ -175,6 +237,8 @@ pub fn apply_island_bounds_with_preview<R: Runtime>(
         ISLAND_EXPANDED_HEIGHT_LOGICAL
     } else if preview {
         ISLAND_PREVIEW_HEIGHT_LOGICAL
+    } else if is_peek {
+        PEEK_HEIGHT_LOGICAL
     } else {
         NOTCH_COLLAPSED_HEIGHT_LOGICAL
     };
@@ -192,9 +256,10 @@ pub fn apply_island_bounds_with_preview<R: Runtime>(
         let size = monitor.size();
         let scale = monitor.scale_factor();
 
-        let (x, y, phys_w, phys_h) = calculate_clamped_bounds_with_preview(
+        let (x, y, phys_w, phys_h) = calculate_clamped_bounds_with_state(
             expanded,
             preview,
+            peek,
             scale,
             pos.x,
             pos.y,
@@ -243,6 +308,173 @@ pub fn show_and_focus_main<R: Runtime>(app: &tauri::AppHandle<R>) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+/// Checks whether a maximized or fullscreen window's bounding box meaningfully overlaps the top strip of a monitor.
+/// Uses a 16px horizontal margin so a maximized window's 7–8px invisible resize border on an adjacent
+/// monitor does not falsely trigger auto-hide on this monitor.
+#[allow(clippy::too_many_arguments)]
+pub fn rect_overlaps_monitor_top(
+    win_left: i32,
+    win_top: i32,
+    win_right: i32,
+    win_bottom: i32,
+    mon_x: i32,
+    mon_y: i32,
+    mon_width: u32,
+    mon_height: u32,
+) -> bool {
+    let mon_right = mon_x + mon_width as i32;
+    let mon_bottom = mon_y + mon_height as i32;
+    let horiz_overlap = win_right > mon_x + 16 && win_left < mon_right - 16;
+    // Allow up to 120px top clearance so top-docked high-DPI taskbars don't defeat maximized detection.
+    let touches_top_strip =
+        win_top <= mon_y + 120 && win_bottom > mon_y + 120 && win_top < mon_bottom;
+    horiz_overlap && touches_top_strip
+}
+
+pub fn rect_covers_monitor_fullscreen(
+    win_left: i32,
+    win_top: i32,
+    win_right: i32,
+    win_bottom: i32,
+    mon_x: i32,
+    mon_y: i32,
+    mon_width: u32,
+    mon_height: u32,
+) -> bool {
+    let mon_right = mon_x + mon_width as i32;
+    let mon_bottom = mon_y + mon_height as i32;
+    win_left <= mon_x + 2
+        && win_top <= mon_y + 2
+        && win_right >= mon_right - 2
+        && win_bottom >= mon_bottom - 2
+}
+
+#[cfg(windows)]
+pub fn is_foreground_maximized_on_monitor(
+    mon_x: i32,
+    mon_y: i32,
+    mon_width: u32,
+    mon_height: u32,
+) -> bool {
+    #[repr(C)]
+    struct Rect {
+        left: i32,
+        top: i32,
+        right: i32,
+        bottom: i32,
+    }
+
+    extern "system" {
+        fn GetForegroundWindow() -> isize;
+        fn IsZoomed(hwnd: isize) -> i32;
+        fn IsWindowVisible(hwnd: isize) -> i32;
+        fn GetWindowRect(hwnd: isize, lp_rect: *mut Rect) -> i32;
+        fn GetWindowThreadProcessId(hwnd: isize, lpdw_process_id: *mut u32) -> u32;
+    }
+
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd == 0 {
+            return false;
+        }
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, &mut pid);
+        if pid == std::process::id() {
+            return false;
+        }
+        if IsWindowVisible(hwnd) == 0 {
+            return false;
+        }
+        let mut rect = Rect {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        if GetWindowRect(hwnd, &mut rect) == 0 {
+            return false;
+        }
+        let is_zoomed = IsZoomed(hwnd) != 0;
+        let is_fullscreen = rect_covers_monitor_fullscreen(
+            rect.left,
+            rect.top,
+            rect.right,
+            rect.bottom,
+            mon_x,
+            mon_y,
+            mon_width,
+            mon_height,
+        );
+        if !is_zoomed && !is_fullscreen {
+            return false;
+        }
+        rect_overlaps_monitor_top(
+            rect.left,
+            rect.top,
+            rect.right,
+            rect.bottom,
+            mon_x,
+            mon_y,
+            mon_width,
+            mon_height,
+        )
+    }
+}
+
+#[cfg(not(windows))]
+pub fn is_foreground_maximized_on_monitor(
+    _mon_x: i32,
+    _mon_y: i32,
+    _mon_width: u32,
+    _mon_height: u32,
+) -> bool {
+    false
+}
+
+pub fn is_foreground_maximized_for_window<R: Runtime>(
+    window: &WebviewWindow<R>,
+    target_monitor_index: usize,
+) -> bool {
+    let monitors = window.available_monitors().unwrap_or_default();
+    let chosen = monitors
+        .get(target_monitor_index)
+        .cloned()
+        .or_else(|| window.current_monitor().ok().flatten())
+        .or_else(|| window.primary_monitor().ok().flatten())
+        .or_else(|| monitors.into_iter().next());
+
+    if let Some(monitor) = chosen {
+        let pos = monitor.position();
+        let size = monitor.size();
+        is_foreground_maximized_on_monitor(pos.x, pos.y, size.width, size.height)
+    } else {
+        false
+    }
+}
+
+/// Polls Windows foreground maximized state at 250ms and emits `halo://maximized-foreground`
+/// only when the boolean transitions.
+pub fn start_maximized_foreground_watcher<R: Runtime>(app: tauri::AppHandle<R>) {
+    std::thread::spawn(move || {
+        let mut last_state: Option<bool> = None;
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            let Some(window) = app.get_webview_window("main") else {
+                continue;
+            };
+            let target_monitor_index = app
+                .try_state::<Mutex<UserSettings>>()
+                .and_then(|s| s.lock().ok().map(|g| g.target_monitor_index))
+                .unwrap_or(0);
+            let maximized = is_foreground_maximized_for_window(&window, target_monitor_index);
+            if last_state != Some(maximized) {
+                last_state = Some(maximized);
+                let _ = app.emit("halo://maximized-foreground", maximized);
+            }
+        }
+    });
 }
 
 #[cfg(test)]
@@ -326,5 +558,40 @@ mod tests {
 
         let (_, y_max, _, _) = calculate_clamped_bounds(false, 1.0, 0, 0, 1920, 1080, 0, 500);
         assert_eq!(y_max, 64);
+    }
+
+    #[test]
+    fn peek_bar_bounds_are_compact_and_flush_top() {
+        // 1080p @ 1.0x: peek ignores top_inset_px and docks flush at y = 0
+        let (x, y, w, h) =
+            calculate_clamped_bounds_with_state(false, false, true, 1.0, 0, 0, 1920, 1080, 0, 24);
+        assert_eq!((x, y, w, h), (900, 0, 120, 5));
+
+        // 1440p @ 1.25x on left secondary monitor
+        let (x2, y2, w2, h2) = calculate_clamped_bounds_with_state(
+            false, false, true, 1.25, -2560, 0, 2560, 1440, 0, 12,
+        );
+        assert_eq!((w2, h2, y2), (150, 6, 0));
+        assert_eq!(x2, -2560 + (2560 - 150) / 2);
+
+        // Preview and expanded always take precedence over peek
+        let (_, _, pw, ph) =
+            calculate_clamped_bounds_with_state(false, true, true, 1.0, 0, 0, 1920, 1080, 0, 0);
+        assert_eq!((pw, ph), (340, 112));
+
+        let (_, _, ew, eh) =
+            calculate_clamped_bounds_with_state(true, false, true, 1.0, 0, 0, 1920, 1080, 0, 0);
+        assert_eq!((ew, eh), (460, 564));
+    }
+
+    #[test]
+    fn maximized_overlap_ignores_adjacent_monitor_resize_borders() {
+        // Maximized window on primary monitor (with -8px invisible Windows border)
+        assert!(rect_overlaps_monitor_top(-8, -8, 1928, 1048, 0, 0, 1920, 1080));
+        // Same window's 8px border bleeding into left monitor (-1920..0) should NOT trigger left monitor
+        assert!(!rect_overlaps_monitor_top(-8, -8, 1928, 1048, -1920, 0, 1920, 1080));
+        // Maximized window on left monitor should trigger left monitor, not primary
+        assert!(rect_overlaps_monitor_top(-1928, -8, 8, 1048, -1920, 0, 1920, 1080));
+        assert!(!rect_overlaps_monitor_top(-1928, -8, 8, 1048, 0, 0, 1920, 1080));
     }
 }

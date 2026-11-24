@@ -488,7 +488,13 @@ pub fn approve_workspace(
         .map_err(|_| "Settings lock poisoned".to_string())?;
 
     let trimmed = workspace_path.trim().to_string();
-    if !trimmed.is_empty() && !guard.approved_workspaces.contains(&trimmed) {
+    let target_key = crate::config::normalize_path_key(&trimmed);
+    if !trimmed.is_empty()
+        && !guard
+            .approved_workspaces
+            .iter()
+            .any(|w| crate::config::normalize_path_key(w) == target_key)
+    {
         guard.approved_workspaces.push(trimmed);
         *guard = guard.save_to_disk()?;
     }
@@ -504,9 +510,10 @@ pub fn revoke_workspace(
         .lock()
         .map_err(|_| "Settings lock poisoned".to_string())?;
 
+    let target_key = crate::config::normalize_path_key(&workspace_path);
     guard
         .approved_workspaces
-        .retain(|w| w.trim() != workspace_path.trim());
+        .retain(|w| crate::config::normalize_path_key(w) != target_key);
     *guard = guard.save_to_disk()?;
     Ok(guard.clone())
 }

@@ -1,17 +1,32 @@
 # Microsoft Store Publishing — STXIC Halo
 
-**Status:** checklist and research; not submitted, approved or signed as of 2026-10-25.
+**Status:** MSIX Store pipeline ready (`npm run desktop:build:msix`); Partner Center app reservation & upload pending.
 
 ## Official documentation
 - Microsoft Store onboarding: https://learn.microsoft.com/en-us/windows/apps/publish/get-started
-- Win32 distribution: https://learn.microsoft.com/en-us/windows/apps/distribute-through-store/how-to-distribute-your-win32-app-through-microsoft-store
+- Package a desktop app as MSIX: https://learn.microsoft.com/en-us/windows/msix/package/manual-packaging-desktop-app
 - Tauri Windows installer: https://tauri.app/distribute/windows-installer/
 - Tauri Store guide: https://tauri.app/distribute/microsoft-store/
 
-## Recommended path for this Tauri starter
-Tauri currently bundles MSI or NSIS setup EXE. Microsoft Store accepts a **signed, hosted, offline EXE/MSI installer** as an unpackaged Win32 listing, or you can separately package a Win32 app as MSIX (with different signing/update benefits). Tauri's official Store guide documents the EXE/MSI path. See current documentation at build time.
+## Recommended free path: MSIX (`makeappx.exe`)
+For zero certificate cost and zero hosting cost, submit STXIC Halo as a **packaged Desktop Bridge MSIX** (`runFullTrust`) rather than an unpackaged Win32 EXE/MSI:
+- **Free Store signing:** Microsoft Partner Center automatically signs `.msix` submissions with the Microsoft Store certificate. (Do **not** upload a self-signed `.msix` to Partner Center.)
+- **Free hosting & updates:** Upload the `.msix` directly in Partner Center; Microsoft hosts and updates it via the Microsoft Store.
+- **Win32 EXE/MSI alternative:** `npm run desktop:build:store` (`src-tauri/tauri.store.conf.json`) builds offline-WebView2 `nsis` + `msi` installers if you ever distribute outside the Store or pay for Authenticode signing.
 
-**Important:** Microsoft Store does **not** automatically sign EXE/MSI for you. You must sign those installers yourself. MSIX Store submissions can receive Microsoft signing. The Store EXE/MSI path also has installer hosting and update responsibility implications.
+## Step-by-step MSIX build & submission
+1. **Reserve the app name in Partner Center:**
+   - Create an app for **STXIC Halo** in Microsoft Partner Center under **STXIC Labs**.
+   - Open **Product management → Product identity** and copy your exact `Package/Identity/Name` and `Package/Identity/Publisher` (`CN=...`).
+2. **Build the Store MSIX (`release-output/STXIC-Halo_<version>_x64.msix`):**
+   ```powershell
+   npm run desktop:build:msix -- -PackageName "<PartnerCenterName>" -Publisher "<PartnerCenterPublisherCN>"
+   ```
+   *(Pass `-SkipBuild` if `src-tauri/target/release/stxic-halo.exe` is already up to date, or `-TestSign` to create a local self-signed build strictly for local sideloading / Windows App Certification Kit testing.)*
+3. **Host the Privacy Policy for free (GitHub Pages):**
+   - Publish `docs/release/PRIVACY_POLICY_DRAFT.md` on an HTTPS GitHub Pages URL and enter that URL + `christianlascuna098@gmail.com` in Partner Center.
+4. **Partner Center reviewer note (`runFullTrust`):**
+   - Note that Halo is a local developer companion that reads local AI coding tool directories (`~/.claude`, `~/.codex`, `~/.copilot`, `~/.gemini`), installs user-triggered hooks, and runs allowlisted verification commands (`git status`, test runners) only in user-approved workspaces.
 
 ## Gate 1 — Identity and naming
 - [ ] Check STXIC Halo availability in Partner Center.
