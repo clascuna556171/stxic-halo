@@ -43,6 +43,7 @@ import type {
   AgentEvent,
   AlertItem,
   ClaudeHookStatus,
+  CodexSessionTelemetry,
   DiagnosticBundleExport,
   IntegrationStatus,
   LaunchAtLoginStatus,
@@ -193,6 +194,34 @@ export function areUsageResultsEqual(a: UsageReadResult, b: UsageReadResult): bo
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+export function areCodexTelemetryEqual(
+  a: readonly CodexSessionTelemetry[],
+  b: readonly CodexSessionTelemetry[]
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.session_id !== y.session_id ||
+      x.workspace !== y.workspace ||
+      x.status !== y.status ||
+      x.total_tokens !== y.total_tokens ||
+      x.context_tokens !== y.context_tokens ||
+      x.context_window !== y.context_window ||
+      x.context_percent !== y.context_percent ||
+      x.usage_observed_at !== y.usage_observed_at ||
+      x.last_seen !== y.last_seen ||
+      x.last_event !== y.last_event ||
+      !areQuotasEqual(x.quota_windows, y.quota_windows)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function useHaloRuntime() {
   const [expanded, setExpanded] = useState(false);
   const [preview, setPreview] = useState(false);
@@ -236,6 +265,8 @@ export function useHaloRuntime() {
 
   const usageResultRef = useRef(usageResult);
   usageResultRef.current = usageResult;
+
+  const codexTelemetryRef = useRef<CodexSessionTelemetry[]>([]);
 
   const tabRef = useRef(tab);
   tabRef.current = tab;
@@ -581,8 +612,14 @@ export function useHaloRuntime() {
         setProcessLifecycle(processSnapshot);
       }
 
-      // Guard agents update: only rebuild and reconcile sessions if events or lifecycle changed, or if list is empty
-      if (eventsChanged || lifecycleChanged || agentsRef.current.length === 0) {
+      // Guard Codex telemetry update (quota windows & token totals can update without new lifecycle events)
+      const codexTelemetryChanged = !areCodexTelemetryEqual(codexTelemetryRef.current, codexTelemetry);
+      if (codexTelemetryChanged) {
+        codexTelemetryRef.current = codexTelemetry;
+      }
+
+      // Guard agents update: rebuild and reconcile sessions if events, lifecycle, or Codex telemetry changed
+      if (eventsChanged || lifecycleChanged || codexTelemetryChanged || agentsRef.current.length === 0) {
         const claudeAgents = sessionsFromEvents(nextEvents.filter((e) => e.source !== 'codex'), {
           staleMinutes: settingsRef.current.stale_minutes,
         });

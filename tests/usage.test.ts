@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lowQuotaWarnings, providerUsage, quotaState, usageAge } from '../src/lib/usage';
+import { lowQuotaWarnings, normalizeQuotaWindow, providerUsage, quotaState, quotaWindowKind, usageAge } from '../src/lib/usage';
 import { parseCodexRolloutLines, reduceCodexSessions } from '../src/lib/codexAdapter';
 import { sessionsFromEvents, PROVIDER_ADAPTERS } from '../src/lib/agentEvents';
 import { reconcileSessions } from '../src/lib/sessionReconciliation';
@@ -85,4 +85,60 @@ it('warns only for fresh unexpired low quotas', () => {
   const make = (label: string, used_percent: number, observed_at: string, resets_at: number) => ({ label, used_percent, observed_at, resets_at });
   const quotas = [make('low', 80, new Date(now).toISOString(), now / 1000 + 3600), make('fine', 79, new Date(now).toISOString(), now / 1000 + 3600), make('stale', 95, new Date(now - 16 * 60000).toISOString(), now / 1000 + 3600), make('expired', 99, new Date(now).toISOString(), now / 1000 - 1)];
   expect(lowQuotaWarnings([], [report({ quotas })], now).map(w => w.quota.label)).toEqual(['low']);
+});
+
+describe('5-hour and 1-week quota normalization and active state', () => {
+  it('normalizes and deduplicates 5-hour and 1-week windows across sources and sorts 5-hour first', () => {
+    const older = new Date(Date.now() - 60_000).toISOString();
+    const newer = new Date(Date.now() - 1_000).toISOString();
+    const reset5h = Math.floor(Date.now() / 1000) + 3600;
+    const reset1w = Math.floor(Date.now() / 1000) + 86400 * 3;
+    const usage = providerUsage('codex', [], [
+      report({
+        provider: 'codex',
+        source: 'session-log',
+        sessions: [{ session_id: 's1', total_tokens: 42000, cost_usd: null, observed_at: newer }],
+        quotas: [
+          { label: 'Weekly', used_percent: 31, window_minutes: 10080, resets_at: reset1w, observed_at: older },
+          { label: 'codex primary', used_percent: 50, window_minutes: 300, resets_at: reset5h, observed_at: older },
+          { label: 'review 1-week', used_percent: 12, window_minutes: 10080, resets_at: reset1w, observed_at: newer },
+        ],
+      }),
+      report({
+        provider: 'codex',
+        source: 'statusline',
+        sessions: [],
+        quotas: [
+          { label: 'Five-hour', used_percent: 64, window_minutes: 300, resets_at: reset5h, observed_at: newer },
+        ],
+      }),
+    ]);
+
+    expect(usage.quotas.map(q => q.label)).toEqual(['5-hour', '1-week', 'review 1-week']);
+    expect(usage.quotas[0].used_percent).toBe(64);
+    expect(usage.quotas[1].used_percent).toBe(31);
+    expect(usage.sessions[0].total_tokens).toBe(42000);
+    expect(normalizeQuotaWindow({ label: '7-day limit', used_percent: 10, observed_at: newer }).label).toBe('1-week');
+    expect(quotaWindowKind({ label: '5h', window_minutes: null })).toBe('5-hour');
+    expect(quotaWindowKind({ label: '5 hrs', window_minutes: null })).toBe('5-hour');
+    expect(quotaWindowKind({ label: '1w', window_minutes: null })).toBe('1-week');
+    expect(quotaWindowKind({ label: '7d', window_minutes: null })).toBe('1-week');
+  });
+
+  it('keeps unexpired windows active even when observed more than 15 minutes ago', () => {
+    const now = Date.now();
+    const oldObservation = new Date(now - 45 * 60_000).toISOString();
+    const futureReset = Math.floor(now / 1000) + 7200;
+    const pastReset = Math.floor(now / 1000) - 60;
+
+    const activeState = quotaState({ label: '1-week', used_percent: 31, window_minutes: 10080, resets_at: futureReset, observed_at: oldObservation }, now);
+    expect(activeState?.active).toBe(true);
+    expect(activeState?.expired).toBe(false);
+    expect(activeState?.used).toBe(31);
+    expect(activeState?.remaining).toBe(69);
+
+    const expiredState = quotaState({ label: '5-hour', used_percent: 99, window_minutes: 300, resets_at: pastReset, observed_at: oldObservation }, now);
+    expect(expiredState?.active).toBe(false);
+    expect(expiredState?.expired).toBe(true);
+  });
 });

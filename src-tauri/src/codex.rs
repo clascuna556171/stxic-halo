@@ -84,6 +84,20 @@ fn collect_rollout_files(dir: &Path, acc: &mut Vec<(PathBuf, Option<SystemTime>)
     }
 }
 
+fn format_codex_quota_label(bucket: &str, slot: &str, window_minutes: Option<u64>) -> String {
+    let window_label = match window_minutes {
+        Some(300) => "5-hour",
+        Some(10080) => "1-week",
+        _ => slot,
+    };
+    let trimmed: String = bucket.chars().take(48).collect();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("codex") {
+        window_label.to_string()
+    } else {
+        format!("{trimmed} {window_label}")
+    }
+}
+
 /// Parses a rollout JSONL session file strictly observing the security boundary:
 /// NEVER reads auth.json, API keys, prompt transcripts, or assistant response text.
 /// Extracts only: session_id, cwd, timestamp, event type, token counts, and context percentage.
@@ -211,15 +225,18 @@ pub fn parse_rollout_file(path: &Path) -> Result<(CodexSessionTelemetry, Vec<Age
                     "token_count" => {
                         if let Some(limits) = payload.get("rate_limits").filter(|v| v.is_object()) {
                             let bucket = limits.get("limit_id").and_then(|v| v.as_str()).unwrap_or("codex");
+                            let trimmed_bucket: String = bucket.chars().take(48).collect();
+                            let is_default_bucket = trimmed_bucket.is_empty() || trimmed_bucket.eq_ignore_ascii_case("codex");
                             let mut windows = Vec::new();
                             for slot in ["primary", "secondary"] {
                                 if let Some(window) = limits.get(slot) {
                                     if let Some(used) = window.get("used_percent").and_then(|v| v.as_f64())
                                         .filter(|n| n.is_finite() && (0.0..=100.0).contains(n)) {
+                                        let window_minutes = window.get("window_minutes").and_then(|v| v.as_u64());
                                         windows.push(crate::usage::QuotaWindow {
-                                            label: format!("{} {}", bucket.chars().take(48).collect::<String>(), slot),
+                                            label: format_codex_quota_label(&trimmed_bucket, slot, window_minutes),
                                             used_percent: used,
-                                            window_minutes: window.get("window_minutes").and_then(|v| v.as_u64()),
+                                            window_minutes,
                                             resets_at: window.get("resets_at").and_then(|v| v.as_u64())
                                                 .filter(|n| *n <= 253_402_300_799),
                                             observed_at: ts.to_owned(),
@@ -228,8 +245,15 @@ pub fn parse_rollout_file(path: &Path) -> Result<(CodexSessionTelemetry, Vec<Age
                                 }
                             }
                             // Replace only this pool; never combine different model quotas.
-                            let prefix = format!("{} ", bucket.chars().take(48).collect::<String>());
-                            telemetry.quota_windows.retain(|q| !q.label.starts_with(&prefix));
+                            if is_default_bucket {
+                                telemetry.quota_windows.retain(|q| {
+                                    !matches!(q.label.as_str(), "5-hour" | "1-week" | "primary" | "secondary")
+                                        && !q.label.starts_with("codex ")
+                                });
+                            } else {
+                                let prefix = format!("{trimmed_bucket} ");
+                                telemetry.quota_windows.retain(|q| !q.label.starts_with(&prefix));
+                            }
                             telemetry.quota_windows.extend(windows);
                             telemetry.quota_windows.truncate(8);
                         }
@@ -395,8 +419,8 @@ mod tests {
         assert_eq!(telemetry.usage_observed_at.as_deref(), Some("2026-10-26T12:01:00Z"));
         assert_eq!(telemetry.context_tokens, None);
         assert_eq!(telemetry.quota_windows.len(), 2);
-        assert_eq!(telemetry.quota_windows.iter().find(|q| q.label == "codex primary").unwrap().used_percent, 0.0);
-        assert_eq!(telemetry.quota_windows.iter().find(|q| q.label == "review primary").unwrap().used_percent, 40.0);
+        assert_eq!(telemetry.quota_windows.iter().find(|q| q.label == "5-hour").unwrap().used_percent, 0.0);
+        assert_eq!(telemetry.quota_windows.iter().find(|q| q.label == "review 1-week").unwrap().used_percent, 40.0);
         let serialized = serde_json::to_string(&telemetry).unwrap();
         assert!(!serialized.contains("prompt"));
     }

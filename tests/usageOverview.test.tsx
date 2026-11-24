@@ -56,4 +56,35 @@ describe('usage panel', () => {
     expect(html).toContain('>1.5</dd>');
     expect(html).not.toContain('$1.50');
   });
+  it('shows 5-hour and 1-week quotas alongside token consumption even when observed >15m ago if unexpired', () => {
+    const olderObserved = new Date(Date.now() - 45 * 60_000).toISOString();
+    const future5h = Math.floor(Date.now() / 1000) + 7200;
+    const future1w = Math.floor(Date.now() / 1000) + 86400 * 4;
+    const codexReport: UsageReadResult = {
+      reports: [{
+        schema_version: 1,
+        provider: 'codex',
+        source: 'session-log',
+        sessions: [{ session_id: 'codex-1', total_tokens: 187500, cost_usd: null, observed_at: olderObserved }],
+        quotas: [
+          { label: '1-week', used_percent: 31, window_minutes: 10080, resets_at: future1w, observed_at: olderObserved },
+          { label: '5-hour', used_percent: 62, window_minutes: 300, resets_at: future5h, observed_at: olderObserved },
+        ],
+      }],
+      errors: [],
+    };
+    const html = renderToStaticMarkup(<UsageOverview agents={[]} result={codexReport} />);
+    const fiveHourIdx = html.indexOf('<strong>5-hour</strong>');
+    const oneWeekIdx = html.indexOf('<strong>1-week</strong>');
+    const detailsIdx = html.indexOf('<details class="usage-provider-details"');
+    expect(fiveHourIdx).toBeGreaterThan(-1);
+    expect(oneWeekIdx).toBeGreaterThan(fiveHourIdx);
+    expect(detailsIdx).toBeGreaterThan(oneWeekIdx);
+    expect(html).toContain('usage-limit-row--healthy');
+    expect(html).toContain('38% left · 62% used');
+    expect(html).toContain('69% left · 31% used');
+    expect(html).toContain(`${(187500).toLocaleString()} tokens · latest session`);
+    expect(html).toContain('value="38"');
+    expect(html).toContain('value="69"');
+  });
 });

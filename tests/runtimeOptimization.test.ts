@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   areAgentsEqual,
+  areCodexTelemetryEqual,
   areEventsEqual,
   areMetricsEqual,
   areProcessLifecyclesEqual,
   areUsageResultsEqual,
 } from '../src/hooks/useHaloRuntime';
-import type { Agent, AgentEvent, Metrics, ProcessLifecycleSnapshot, UsageReadResult } from '../src/types';
+import type { Agent, AgentEvent, CodexSessionTelemetry, Metrics, ProcessLifecycleSnapshot, UsageReadResult } from '../src/types';
 
 describe('runtimeOptimization equality guards', () => {
   it('areMetricsEqual compares metrics values with epsilon for cpu jitter', () => {
@@ -217,5 +218,27 @@ describe('runtimeOptimization equality guards', () => {
     const errChange: UsageReadResult = JSON.parse(JSON.stringify(baseUsage));
     errChange.errors.push('Disk read failed');
     expect(areUsageResultsEqual(baseUsage, errChange)).toBe(false);
+  });
+
+  it('areCodexTelemetryEqual detects quota window and token updates without event changes', () => {
+    const base: CodexSessionTelemetry[] = [{
+      session_id: 'cx-1',
+      workspace: 'D:/work',
+      status: 'working',
+      total_tokens: 10000,
+      last_seen: '2026-11-23T14:00:00Z',
+      last_event: 'PreToolUse',
+      quota_windows: [{ label: '5-hour', used_percent: 25, window_minutes: 300, resets_at: 1800000000, observed_at: '2026-11-23T14:00:00Z' }],
+    }];
+    const clone: CodexSessionTelemetry[] = JSON.parse(JSON.stringify(base));
+    expect(areCodexTelemetryEqual(base, clone)).toBe(true);
+
+    const tokenChanged: CodexSessionTelemetry[] = JSON.parse(JSON.stringify(base));
+    tokenChanged[0].total_tokens = 25000;
+    expect(areCodexTelemetryEqual(base, tokenChanged)).toBe(false);
+
+    const quotaChanged: CodexSessionTelemetry[] = JSON.parse(JSON.stringify(base));
+    quotaChanged[0].quota_windows![0].used_percent = 40;
+    expect(areCodexTelemetryEqual(base, quotaChanged)).toBe(false);
   });
 });

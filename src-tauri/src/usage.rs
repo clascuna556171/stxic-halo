@@ -269,7 +269,243 @@ fn append_antigravity_usage(
     }
 }
 
-fn collect_usage_reports(read_copilot: bool) -> Result<UsageReadResult, String> {
+fn append_codex_usage<F>(enabled: bool, result: &mut UsageReadResult, read: F)
+where F: FnOnce() -> Result<(Vec<crate::codex::CodexSessionTelemetry>, Vec<crate::events::AgentEvent>), String> {
+    if !enabled {
+        return;
+    }
+    let Ok((telemetries, _)) = read() else {
+        return;
+    };
+    let mut sessions = Vec::new();
+    let mut quota_map: BTreeMap<String, QuotaWindow> = BTreeMap::new();
+    for t in telemetries {
+        if let Some(tokens) = t.total_tokens {
+            let observed = t.usage_observed_at.as_deref().unwrap_or(&t.last_seen);
+            if !t.session_id.is_empty() && t.session_id.len() <= 128 && timestamp_shape(observed) {
+                sessions.push(SessionUsage {
+                    session_id: t.session_id.clone(),
+                    total_tokens: Some(tokens),
+                    cost_usd: None,
+                    premium_requests: None,
+                    observed_at: observed.to_string(),
+                });
+            }
+        }
+        for q in t.quota_windows {
+            if !q.label.is_empty()
+                && q.label.len() <= 80
+                && q.used_percent.is_finite()
+                && (0.0..=100.0).contains(&q.used_percent)
+                && timestamp_shape(&q.observed_at)
+            {
+                let replace = quota_map
+                    .get(&q.label)
+                    .map_or(true, |prev| q.observed_at > prev.observed_at);
+                if replace {
+                    quota_map.insert(q.label.clone(), q);
+                }
+            }
+        }
+    }
+    sessions.truncate(16);
+    let quotas: Vec<QuotaWindow> = quota_map.into_values().take(8).collect();
+    if !sessions.is_empty() || !quotas.is_empty() {
+        result.reports.push(ProviderUsageReport {
+            schema_version: 1,
+            provider: "codex".to_string(),
+            sessions,
+            quotas,
+            source: Some(UsageSource::SessionLog),
+        });
+    }
+}
+
+/// Reads metadata-only token consumption and rate-limit exhaustion records from a Claude Code JSONL tail.
+/// Never reads or retains prompt/response text or credentials.
+pub(crate) fn read_claude_session_tail(path: &Path, session_id: &str) -> Option<ProviderUsageReport> {
+    if session_id.is_empty() || session_id.len() > 128 {
+        return None;
+    }
+    let mut file = File::open(path).ok()?;
+    let len = file.metadata().ok()?.len();
+    const CLAUDE_TAIL_BYTES: u64 = 262_144;
+    let start = len.saturating_sub(CLAUDE_TAIL_BYTES);
+    if start > 0 {
+        file.seek(SeekFrom::Start(start)).ok()?;
+    }
+    let mut buf = Vec::new();
+    file.take(CLAUDE_TAIL_BYTES).read_to_end(&mut buf).ok()?;
+    let slice = if start > 0 {
+        match buf.iter().position(|c| *c == b'\n') {
+            Some(pos) => &buf[pos + 1..],
+            None => return None,
+        }
+    } else {
+        &buf[..]
+    };
+    let text = String::from_utf8_lossy(slice);
+    let mut latest_session: Option<SessionUsage> = None;
+    let mut quota_map: BTreeMap<String, QuotaWindow> = BTreeMap::new();
+
+    for line in text.lines() {
+        if !line.contains("\"usage\"") && !line.contains("\"quotaLimits\"") {
+            continue;
+        }
+        let Ok(val) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let Some(ts) = val.get("timestamp").and_then(|v| v.as_str()).filter(|s| timestamp_shape(s)) else {
+            continue;
+        };
+
+        if let Some(usage) = val.get("message").and_then(|m| m.get("usage")).filter(|v| v.is_object()) {
+            let input = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let cache_create = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let cache_read = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let output = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+            let total = input
+                .saturating_add(cache_create)
+                .saturating_add(cache_read)
+                .saturating_add(output);
+            if total > 0 && total <= 9_007_199_254_740_991 {
+                latest_session = Some(SessionUsage {
+                    session_id: session_id.to_string(),
+                    total_tokens: Some(total),
+                    cost_usd: None,
+                    premium_requests: None,
+                    observed_at: ts.to_string(),
+                });
+            }
+        }
+
+        if let Some(ql) = val.get("quotaLimits").filter(|v| v.is_object()) {
+            let status = ql.get("status").and_then(|v| v.as_str()).unwrap_or("");
+            if status == "rejected" {
+                let limit_type = ql.get("rateLimitType").and_then(|v| v.as_str()).unwrap_or("");
+                let window_info = match limit_type {
+                    "five_hour" => Some(("5-hour", 300_u64)),
+                    "seven_day" => Some(("1-week", 10_080_u64)),
+                    _ => None,
+                };
+                if let Some((label, window_minutes)) = window_info {
+                    let resets_at = ql
+                        .get("resetsAt")
+                        .and_then(|v| v.as_u64())
+                        .filter(|n| *n <= 253_402_300_799);
+                    quota_map.insert(
+                        label.to_string(),
+                        QuotaWindow {
+                            label: label.to_string(),
+                            used_percent: 100.0,
+                            window_minutes: Some(window_minutes),
+                            resets_at,
+                            observed_at: ts.to_string(),
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    let sessions: Vec<SessionUsage> = latest_session.into_iter().collect();
+    let quotas: Vec<QuotaWindow> = quota_map.into_values().collect();
+    if sessions.is_empty() && quotas.is_empty() {
+        return None;
+    }
+    Some(ProviderUsageReport {
+        schema_version: 1,
+        provider: "claude-code".to_string(),
+        sessions,
+        quotas,
+        source: Some(UsageSource::SessionLog),
+    })
+}
+
+fn append_claude_session_usage(
+    cache: &mut BTreeMap<(PathBuf, String), UsageCacheEntry>,
+    result: &mut UsageReadResult,
+) {
+    let Some(home) = env::var_os("USERPROFILE").or_else(|| env::var_os("HOME")).map(PathBuf::from) else {
+        return;
+    };
+    let projects_dir = home.join(".claude").join("projects");
+    let Ok(project_entries) = fs::read_dir(&projects_dir) else {
+        return;
+    };
+    let mut candidates = Vec::new();
+    for project_entry in project_entries.flatten().take(64) {
+        if !project_entry.file_type().is_ok_and(|t| t.is_dir()) {
+            continue;
+        }
+        let Ok(files) = fs::read_dir(project_entry.path()) else {
+            continue;
+        };
+        for file_entry in files.flatten().take(64) {
+            let path = file_entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
+                continue;
+            }
+            let Some(session_id) = path.file_stem().and_then(|s| s.to_str()).map(str::to_string) else {
+                continue;
+            };
+            if session_id.is_empty() || session_id.len() > 128 {
+                continue;
+            }
+            if let Ok(meta) = file_entry.metadata() {
+                if meta.is_file() {
+                    candidates.push((path, session_id, meta.len(), meta.modified().ok()));
+                }
+            }
+        }
+    }
+    candidates.sort_by_key(|(_, _, _, modified)| std::cmp::Reverse(*modified));
+    let mut sessions = Vec::new();
+    let mut quota_map: BTreeMap<String, QuotaWindow> = BTreeMap::new();
+    for (path, session_id, len, modified) in candidates.into_iter().take(8) {
+        let key = (path.clone(), "claude-code".to_string());
+        let report_opt = if let Some((c_len, c_mod, cached)) = cache.get(&key) {
+            if *c_len == len && *c_mod == modified {
+                cached.as_ref().ok().cloned().flatten()
+            } else {
+                let parsed = read_claude_session_tail(&path, &session_id);
+                cache.insert(key, (len, modified, Ok(parsed.clone())));
+                parsed
+            }
+        } else {
+            let parsed = read_claude_session_tail(&path, &session_id);
+            if cache.len() >= 128 {
+                cache.clear();
+            }
+            cache.insert(key, (len, modified, Ok(parsed.clone())));
+            parsed
+        };
+        if let Some(report) = report_opt {
+            sessions.extend(report.sessions);
+            for q in report.quotas {
+                let replace = quota_map
+                    .get(&q.label)
+                    .map_or(true, |prev| q.observed_at > prev.observed_at);
+                if replace {
+                    quota_map.insert(q.label.clone(), q);
+                }
+            }
+        }
+    }
+    sessions.truncate(16);
+    let quotas: Vec<QuotaWindow> = quota_map.into_values().take(8).collect();
+    if !sessions.is_empty() || !quotas.is_empty() {
+        result.reports.push(ProviderUsageReport {
+            schema_version: 1,
+            provider: "claude-code".to_string(),
+            sessions,
+            quotas,
+            source: Some(UsageSource::SessionLog),
+        });
+    }
+}
+
+fn collect_usage_reports(read_copilot: bool, read_codex: bool) -> Result<UsageReadResult, String> {
     let root = crate::paths::app_data_dir()?.join("usage");
     let mut result = UsageReadResult::default();
     let mut cache = USAGE_CACHE
@@ -283,8 +519,10 @@ fn collect_usage_reports(read_copilot: bool) -> Result<UsageReadResult, String> 
             Err(error) => result.errors.push(error),
         }
     }
+    append_codex_usage(read_codex, &mut result, || crate::codex::read_local_codex_sessions(8));
     append_copilot_usage(read_copilot, &mut result, crate::copilot_usage::read_local_usage);
     append_antigravity_usage(&mut cache, &mut result);
+    append_claude_session_usage(&mut cache, &mut result);
     // One snapshot per OpenCode session prevents independent hosts overwriting
     // one another. Inspect at most 32 entries and read the newest 16 bounded files.
     collect_recent_json_reports(
@@ -310,8 +548,11 @@ fn collect_usage_reports(read_copilot: bool) -> Result<UsageReadResult, String> 
 
 #[tauri::command]
 pub async fn read_usage_reports(settings: State<'_, Mutex<UserSettings>>) -> Result<UsageReadResult, String> {
-    let read_copilot = settings.lock().map_err(|_| "Settings unavailable")?.enable_copilot_usage_logs;
-    tauri::async_runtime::spawn_blocking(move || collect_usage_reports(read_copilot))
+    let (read_copilot, read_codex) = {
+        let guard = settings.lock().map_err(|_| "Settings unavailable")?;
+        (guard.enable_copilot_usage_logs, guard.enable_codex_logs)
+    };
+    tauri::async_runtime::spawn_blocking(move || collect_usage_reports(read_copilot, read_codex))
         .await
         .map_err(|e| format!("Usage reader worker failed: {e}"))?
 }
@@ -371,5 +612,82 @@ mod tests {
         fs::remove_file(&path).unwrap();
         assert!(read_report_cached(&mut cache, &path, "opencode").unwrap().is_none());
         assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn claude_session_tail_extracts_tokens_and_active_quota_without_leaking_content() {
+        let path = std::env::temp_dir().join(format!("halo-claude-tail-{}.jsonl", std::process::id()));
+        fs::write(
+            &path,
+            concat!(
+                "{\"type\":\"assistant\",\"timestamp\":\"2026-11-23T15:25:00.000Z\",\"message\":{\"content\":\"SECRET_TEXT\",\"usage\":{\"input_tokens\":2,\"cache_creation_input_tokens\":1000,\"cache_read_input_tokens\":300000,\"output_tokens\":500}}}\n",
+                "{\"type\":\"assistant\",\"timestamp\":\"2026-11-23T15:27:27.129Z\",\"quotaLimits\":{\"status\":\"rejected\",\"rateLimitType\":\"seven_day\",\"resetsAt\":1795507200},\"message\":{\"usage\":{\"input_tokens\":0,\"output_tokens\":0}}}\n",
+                "{\"type\":\"assistant\",\"timestamp\":\"2026-11-23T15:28:00.000Z\",\"quotaLimits\":{\"status\":\"rejected\",\"rateLimitType\":\"five_hour\",\"resetsAt\":1795490000}}\n"
+            ),
+        )
+        .unwrap();
+        let report = read_claude_session_tail(&path, "ca22cc19-test").unwrap();
+        let _ = fs::remove_file(&path);
+        assert!(report.valid("claude-code"));
+        assert_eq!(report.sessions.len(), 1);
+        assert_eq!(report.sessions[0].total_tokens, Some(301_502));
+        assert_eq!(report.quotas.len(), 2);
+        let five_hr = report.quotas.iter().find(|q| q.label == "5-hour").unwrap();
+        assert_eq!(five_hr.used_percent, 100.0);
+        assert_eq!(five_hr.window_minutes, Some(300));
+        assert_eq!(five_hr.resets_at, Some(1795490000));
+        let weekly = report.quotas.iter().find(|q| q.label == "1-week").unwrap();
+        assert_eq!(weekly.used_percent, 100.0);
+        assert_eq!(weekly.window_minutes, Some(10_080));
+        assert_eq!(weekly.resets_at, Some(1795507200));
+        let serialized = serde_json::to_string(&report).unwrap();
+        assert!(!serialized.contains("SECRET_TEXT"));
+    }
+
+    #[test]
+    fn codex_usage_appends_only_when_enabled_and_preserves_5h_and_1w_quotas() {
+        let mut disabled = UsageReadResult::default();
+        append_codex_usage(false, &mut disabled, || panic!("disabled codex reader must not run"));
+        assert!(disabled.reports.is_empty());
+
+        let mut enabled = UsageReadResult::default();
+        append_codex_usage(true, &mut enabled, || {
+            Ok((
+                vec![crate::codex::CodexSessionTelemetry {
+                    session_id: "codex-s1".into(),
+                    workspace: "C:\\work".into(),
+                    status: "completed".into(),
+                    total_tokens: Some(3_641_074),
+                    usage_observed_at: Some("2026-11-12T13:14:00Z".into()),
+                    quota_windows: vec![
+                        QuotaWindow {
+                            label: "5-hour".into(),
+                            used_percent: 99.0,
+                            window_minutes: Some(300),
+                            resets_at: Some(1794501310),
+                            observed_at: "2026-11-12T13:14:00Z".into(),
+                        },
+                        QuotaWindow {
+                            label: "1-week".into(),
+                            used_percent: 31.0,
+                            window_minutes: Some(10_080),
+                            resets_at: Some(1795069959),
+                            observed_at: "2026-11-12T13:14:00Z".into(),
+                        },
+                    ],
+                    last_seen: "2026-11-12T13:14:00Z".into(),
+                    last_event: "Stop".into(),
+                    ..Default::default()
+                }],
+                vec![],
+            ))
+        });
+        assert_eq!(enabled.reports.len(), 1);
+        let report = &enabled.reports[0];
+        assert!(report.valid("codex"));
+        assert_eq!(report.sessions[0].total_tokens, Some(3_641_074));
+        assert_eq!(report.quotas.len(), 2);
+        assert!(report.quotas.iter().any(|q| q.label == "5-hour" && q.window_minutes == Some(300)));
+        assert!(report.quotas.iter().any(|q| q.label == "1-week" && q.window_minutes == Some(10_080)));
     }
 }

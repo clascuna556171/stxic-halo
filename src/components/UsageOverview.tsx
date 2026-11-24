@@ -47,10 +47,12 @@ const ProviderUsageSection = memo(function ProviderUsageSection({ provider, agen
     </div>
     {usage.quotas.length ? <div className="usage-limit-list">{usage.quotas.map(quota => {
       const state = quotaState(quota)!;
-      return <div className="usage-limit-row" key={quota.label}>
-        <div className="usage-limit-heading"><strong>{quota.label}</strong><span>{state.expired ? 'Awaiting refresh' : `${state.remaining}% left${state.stale ? ' · last report' : ''}`}</span></div>
-        {!state.stale && <meter min={0} max={100} value={state.remaining} aria-label={`${PROVIDER_NAMES[provider]} ${quota.label} remaining quota`} />}
-        <div className="usage-limit-meta">{state.resetMs ? `${state.expired ? 'Reported reset' : 'Resets'} ${new Date(state.resetMs).toLocaleString()}` : 'Reset time unavailable'} · {relativeTime(quota.observed_at)}{state.stale ? ' · needs refresh' : ''}</div>
+      const showMeter = state.active;
+      const tone = state.expired ? 'expired' : state.remaining <= 10 ? 'critical' : state.remaining <= 25 ? 'warning' : 'healthy';
+      return <div className={`usage-limit-row usage-limit-row--${tone}`} key={quota.label}>
+        <div className="usage-limit-heading"><strong>{quota.label}</strong><span className="tabular">{state.expired ? 'Awaiting refresh' : `${state.remaining}% left · ${state.used}% used${state.stale && !state.active ? ' · last report' : ''}`}</span></div>
+        {showMeter && <meter min={0} max={100} value={state.remaining} aria-label={`${PROVIDER_NAMES[provider]} ${quota.label} remaining quota`} />}
+        <div className="usage-limit-meta">{state.resetMs ? `${state.expired ? 'Reported reset' : 'Resets'} ${new Date(state.resetMs).toLocaleString()}` : 'Reset time unavailable'} · {relativeTime(quota.observed_at)}{state.expired ? ' · needs refresh' : ''}</div>
       </div>;
     })}</div> : <p className="usage-no-limit">Limit not available</p>}
     <details className="usage-provider-details"><summary>Usage details</summary>

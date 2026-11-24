@@ -18,7 +18,7 @@ import HaloMark from './components/HaloMark';
 import { Overview, SystemView } from './components/Dashboard';
 import { ProviderConnections } from './components/ProviderConnections';
 import { ProviderIcon } from './components/ProviderIcon';
-import { computeActiveProviderRings, PillUsageRings } from './components/PillUsageRings';
+import { computeActiveProviderRings, PillUsageRing } from './components/PillUsageRings';
 import { ClaudeStatuslineSetup } from './components/ClaudeStatuslineSetup';
 import { DataControls } from './components/DataControls';
 import { useQuotaNotifications, QuotaNotificationSettings } from './components/QuotaNotifications';
@@ -698,49 +698,106 @@ export default function App() {
               onClick={() => { hover.cancel(); setPreview(false); setExpanded(true); }}
               aria-expanded={false}
               aria-label="Open Halo dashboard"
-              title="Hover for tokens · Click to open dashboard"
             >
-              <span className="notch-summary">
-              <span className="notch-left">
-                <span className={`notch-led ${ledStatusClass}`} aria-hidden="true" />
-                <span className="pill-main">
-                  <span className="pill-title">{pillHeadline}</span>
-                  <span className="pill-sep" aria-hidden="true">·</span>
-                  <span className="pill-subtitle tabular">{pillSub}</span>
-                </span>
-              </span>
+              {(() => {
+                const hasFlankingRings = !pendingPermission && pillRings.length >= 2;
+                if (hasFlankingRings) {
+                  return (
+                    <span className="notch-summary has-flanking-rings">
+                      <span className="notch-flank notch-flank-left">
+                        <PillUsageRing ring={pillRings[0]} align="left" />
+                      </span>
+                      <span className="notch-center">
+                        <span className={`notch-led ${ledStatusClass}`} aria-hidden="true" />
+                        <span className="pill-main">
+                          <span className="pill-title">{pillHeadline}</span>
+                          <span className="pill-sep" aria-hidden="true">·</span>
+                          <span className="pill-subtitle tabular">{pillSub}</span>
+                        </span>
+                      </span>
+                      <span className="notch-flank notch-flank-right">
+                        <PillUsageRing ring={pillRings[1]} align="right" />
+                      </span>
+                    </span>
+                  );
+                }
 
-              <span className="notch-right">
-                {pendingPermission ? (
-                  <span className="pill-telemetry tabular warning">Review</span>
-                ) : pillRings.length > 0 ? (
-                  <PillUsageRings rings={pillRings} />
-                ) : (
-                  <span
-                    className={`pill-telemetry tabular ${activeAlerts.length ? 'warning' : 'healthy'}`}
-                  >
-                    {budget ? `${budget.percentRemaining}% left` : 'Local'}
+                return (
+                  <span className="notch-summary">
+                    <span className="notch-left">
+                      <span className={`notch-led ${ledStatusClass}`} aria-hidden="true" />
+                      <span className="pill-main">
+                        <span className="pill-title">{pillHeadline}</span>
+                        <span className="pill-sep" aria-hidden="true">·</span>
+                        <span className="pill-subtitle tabular">{pillSub}</span>
+                      </span>
+                    </span>
+
+                    <span className="notch-right">
+                      {pendingPermission ? (
+                        <span className="pill-telemetry tabular warning">Review</span>
+                      ) : pillRings.length === 1 ? (
+                        <PillUsageRing ring={pillRings[0]} align="right" />
+                      ) : (
+                        <span
+                          className={`pill-telemetry tabular ${activeAlerts.length ? 'warning' : 'healthy'}`}
+                        >
+                          {budget ? `${budget.percentRemaining}% left` : 'Local'}
+                        </span>
+                      )}
+                      <ChevronDown size={13} className="pill-chevron" />
+                    </span>
                   </span>
-                )}
-                <ChevronDown size={13} className="pill-chevron" />
-              </span>
-              </span>
+                );
+              })()}
               <span className="token-preview-body" aria-hidden={!preview}>
-                <span className="token-preview-value tabular">
-                  {budget
-                    ? `${budget.remaining.toLocaleString()} tokens left`
-                    : (pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null))
-                      ? (pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null))!.detail
-                      : 'Token count unavailable'}
-                </span>
-                <span className="token-preview-detail">
-                  {previewAgent ? `${previewAgent.workspace} · ` : ''}
-                  {budget
-                    ? `${leadWorkingAgent ? 'Context' : 'Last report'} · ${relativeTime(previewAgent!.lastSeen)}`
-                    : (pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null))
-                      ? 'Live provider usage'
-                      : 'Waiting for provider data'}
-                </span>
+                {(() => {
+                  const quotaRings = pillRings.filter((r) => r.metric === 'quota');
+                  const fallbackRing = pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null);
+                  if (quotaRings.length >= 2) {
+                    return (
+                      <>
+                        <span className="token-preview-value tabular">{quotaRings[0].previewSummary}</span>
+                        <span className="token-preview-detail tabular">{quotaRings[1].previewSummary}</span>
+                      </>
+                    );
+                  }
+                  const primaryQuota = quotaRings[0];
+                  if (primaryQuota) {
+                    const detailParts: string[] = [];
+                    if (primaryQuota.totalTokens !== null) {
+                      detailParts.push(`${primaryQuota.totalTokens.toLocaleString()} tokens`);
+                    }
+                    if (previewAgent) detailParts.push(previewAgent.workspace);
+                    if (budget) detailParts.push(`${budget.remaining.toLocaleString()} context left`);
+                    if (detailParts.length === 0) detailParts.push('5-hour & 1-week quota · live usage');
+                    return (
+                      <>
+                        <span className="token-preview-value tabular">{primaryQuota.previewSummary}</span>
+                        <span className="token-preview-detail tabular">{detailParts.join(' · ')}</span>
+                      </>
+                    );
+                  }
+                  return (
+                    <>
+                      <span className="token-preview-value tabular">
+                        {fallbackRing
+                          ? fallbackRing.previewSummary
+                          : budget
+                            ? `${budget.remaining.toLocaleString()} context tokens left`
+                            : 'Quota & tokens unavailable'}
+                      </span>
+                      <span className="token-preview-detail">
+                        {previewAgent ? `${previewAgent.workspace} · ` : ''}
+                        {budget
+                          ? `${leadWorkingAgent ? 'Context' : 'Last report'} · ${relativeTime(previewAgent!.lastSeen)}`
+                          : fallbackRing
+                            ? 'Live provider usage'
+                            : 'Waiting for 5h/1w quota & token data'}
+                      </span>
+                    </>
+                  );
+                })()}
                 <span className="token-preview-hint">Click to open dashboard</span>
               </span>
             </button>
