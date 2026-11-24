@@ -43,6 +43,7 @@ const SHORT_LABELS: Record<Provider, string> = {
 const RING_RADIUS = 9.6;
 const RING_STROKE = 2.2;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const RECENT_SESSION_MS = 60 * 60_000;
 
 export function computeActiveProviderRings(
   agents: readonly Agent[],
@@ -71,6 +72,32 @@ export function computeActiveProviderRings(
     });
     if (hasActiveQuota) orderedProviders.push(provider);
   }
+
+  // Keep recently completed sessions and providers with reported token/context usage visible
+  // in the notch pill after an AI finishes a chat or turn, instead of dropping to "unavailable".
+  const recentCandidates: Array<{ provider: Provider; timestamp: number }> = [];
+  for (const provider of USAGE_PROVIDERS) {
+    if (orderedProviders.includes(provider)) continue;
+    const usage = providerUsage(provider, agents, reports);
+    const latestTokenSession = usage.sessions.find(
+      (s) => typeof s.total_tokens === 'number' && s.total_tokens >= 0,
+    );
+    const providerAgents = agents
+      .filter((a) => a.provider === provider)
+      .sort((a, b) => (Date.parse(b.lastSeen) || 0) - (Date.parse(a.lastSeen) || 0));
+    const latestAgent = providerAgents[0];
+    const hasContext = providerAgents.some((a) => contextBudget(a) !== null);
+    const agentTs = latestAgent ? Date.parse(latestAgent.lastSeen) || 0 : 0;
+    const isRecentlySeen = agentTs > 0 && now - agentTs <= RECENT_SESSION_MS;
+
+    if (latestTokenSession || hasContext || isRecentlySeen) {
+      const tokenTs = latestTokenSession ? Date.parse(latestTokenSession.observed_at) || 0 : 0;
+      recentCandidates.push({ provider, timestamp: Math.max(tokenTs, agentTs) });
+    }
+  }
+  recentCandidates
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .forEach(({ provider }) => orderedProviders.push(provider));
 
   return orderedProviders.slice(0, 3).map((provider) => {
     const name = PROVIDER_NAMES[provider] ?? 'AI';
@@ -131,10 +158,16 @@ export function computeActiveProviderRings(
       };
     }
 
-    // 2. Fallback to active session context remaining %.
+    // 2. Fallback to active (or most recent completed) session context remaining %.
     const providerActive = active.filter((a) => a.provider === provider);
+    const contextSource = providerActive.length > 0
+      ? providerActive
+      : agents
+          .filter((a) => a.provider === provider)
+          .sort((a, b) => (Date.parse(b.lastSeen) || 0) - (Date.parse(a.lastSeen) || 0))
+          .slice(0, 1);
     let lowestContext: { percentRemaining: number; remaining: number } | null = null;
-    for (const agent of providerActive) {
+    for (const agent of contextSource) {
       const budget = contextBudget(agent);
       if (!budget) continue;
       if (!lowestContext || budget.percentRemaining < lowestContext.percentRemaining) {
@@ -171,16 +204,18 @@ export function computeActiveProviderRings(
         tokenLabel: compactTokens,
         totalTokens,
         metric: 'tokens',
-        detail: `${name}: ${totalTokens.toLocaleString()} tokens · 5-hour & 1-week quota unavailable`,
-        previewSummary: `${name} · ${compactTokens} tokens · quota unavailable`,
+        detail: `${name}: ${totalTokens.toLocaleString()} tokens · latest session`,
+        previewSummary: `${name} · ${compactTokens} tokens`,
         activeCount,
       };
     }
 
-    // 4. Active provider with no token/quota source reporting yet.
+    // 4. Active or recently completed provider with no token/quota source reporting yet.
     const hint = provider === 'claude-code'
-      ? 'enable Claude status line in Settings for 5h/1w quota'
-      : 'no token/quota source reported yet';
+      ? 'enable Claude Code CLI status line in Settings for 5h/1w quota'
+      : provider === 'antigravity'
+        ? 'enable Antigravity CLI (agy) status line in Settings for quota'
+        : 'no token/quota source reported yet';
     return {
       provider,
       name,
@@ -191,8 +226,8 @@ export function computeActiveProviderRings(
       tokenLabel: null,
       totalTokens: null,
       metric: 'none',
-      detail: `${name}: active (${hint})`,
-      previewSummary: `${name} · active`,
+      detail: `${name}: ${activeCount > 0 ? 'active' : 'recent session'} (${hint})`,
+      previewSummary: `${name} · ${activeCount > 0 ? 'active' : 'recent session'}`,
       activeCount,
     };
   });

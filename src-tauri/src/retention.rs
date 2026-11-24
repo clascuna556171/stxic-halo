@@ -10,7 +10,7 @@ fn candidates(root: &Path, days: u64) -> Result<Vec<PathBuf>, String> {
     let cutoff = SystemTime::now().checked_sub(Duration::from_secs(days * 86400)).ok_or("Invalid retention period")?;
     let canonical_root = match root.canonicalize() { Ok(path) => path, Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(vec![]), Err(_) => return Err("Cannot inspect Halo data folder".into()) };
     let mut paths = vec![root.join("events.jsonl.bak")];
-    for relative in ["usage/opencode-sessions", "usage/claude-statusline"] {
+    for relative in ["usage/opencode-sessions", "usage/claude-statusline", "usage/antigravity-statusline"] {
         let dir = root.join(relative);
         let Ok(meta) = fs::symlink_metadata(&dir) else { continue };
         if !meta.is_dir() || meta.file_type().is_symlink() || !dir.canonicalize().is_ok_and(|p| p.starts_with(&canonical_root)) { continue }

@@ -12,9 +12,10 @@ Halo prioritizes truth-over-vibes: on-device data is never faked, unavailable me
 
 ## Key Features
 - **Compact Floating Capsule:** Top-edge Windows HUD (340×38 collapsed notch, 460×564 expanded dashboard, and 120×5 auto-hide peek bar over maximized apps) with DPI-aware multi-monitor clamping, keyboard shortcuts (Alt+H, Alt+1..4, Esc), and tray icon recovery.
+- **Persistent Multi-Provider Usage Rings:** Glanceable notch quota rings and multi-provider hover preview that retain completed sessions for 1 hour and show live CLI quota (`claude`, `agy`, `codex`) alongside token/context usage.
 - **Proof-of-Work & Evidence Inspector:** Inspect structured Git diff breakdowns (staged, modified, untracked) and opt-in test results (vitest, cargo test, pytest) for user-authorized workspaces.
 - **Multi-Session Collision Detection:** Real-time warnings when two active agent sessions edit intersecting workspace files.
-- **Agent Lifecycle Adapters:** 1-click Claude Code hook management with backup rollback, plus local Codex session rollout log reader.
+- **One-Click CLI Hooks & Status Lines:** Safe, non-destructive setup and removal for Claude Code CLI hooks & `statusLine` and Antigravity CLI (`agy`) `statusLine` (with automatic backups and custom-config protection), plus local Codex, Copilot CLI, and OpenCode readers.
 - **Local System Telemetry & Idle Leak Profiling:** On-device CPU and memory monitoring, background process lifecycle reconciliation, and statistical memory drift detection.
 - **Sanitized Diagnostic Support Bundle:** One-click export of local health and timing metrics without sensitive personal code, transcripts, or keys.
 - **Offline Standalone Installer:** Self-contained setup bundles (NSIS & MSI) with bundled WebView2 for air-gapped installation.

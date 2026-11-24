@@ -568,9 +568,73 @@ export async function exportDiagnosticBundle(): Promise<DiagnosticBundleExport> 
   return invoke<DiagnosticBundleExport>('export_diagnostic_bundle');
 }
 
+export type ClaudeStatuslineState = 'not-configured' | 'halo-configured' | 'custom-configured';
+
+export interface ClaudeStatuslineStatus {
+  state: ClaudeStatuslineState;
+  command: string;
+  config_path: string;
+  script_path: string;
+  backup_exists: boolean;
+  message: string;
+}
+
 export async function prepareClaudeStatusline(): Promise<string> {
   if (!isTauri()) throw new Error('Open the desktop app to prepare the status line.');
   return invoke<string>('prepare_claude_statusline');
+}
+
+export async function checkClaudeStatuslineStatus(): Promise<ClaudeStatuslineStatus> {
+  if (!isTauri()) {
+    return {
+      state: 'not-configured',
+      command: '',
+      config_path: '%USERPROFILE%\\.claude\\settings.json',
+      script_path: '%LOCALAPPDATA%\\STXICHalo\\integrations\\claude-statusline.ps1',
+      backup_exists: false,
+      message: 'Open the desktop app to enable the Claude status line.',
+    };
+  }
+  return invoke<ClaudeStatuslineStatus>('check_claude_statusline_status');
+}
+
+export async function enableClaudeStatusline(): Promise<ClaudeStatuslineStatus> {
+  if (!isTauri()) throw new Error('Open the desktop app to enable the status line.');
+  return invoke<ClaudeStatuslineStatus>('enable_claude_statusline');
+}
+
+export async function disableClaudeStatusline(): Promise<ClaudeStatuslineStatus> {
+  if (!isTauri()) throw new Error('Open the desktop app to disable the status line.');
+  return invoke<ClaudeStatuslineStatus>('disable_claude_statusline');
+}
+
+export async function prepareAntigravityStatusline(): Promise<string> {
+  if (!isTauri()) throw new Error('Open the desktop app to prepare the Antigravity CLI status line.');
+  return invoke<string>('prepare_antigravity_statusline');
+}
+
+export async function checkAntigravityStatuslineStatus(): Promise<ClaudeStatuslineStatus> {
+  if (!isTauri()) {
+    return {
+      state: 'not-configured',
+      command: '',
+      config_path: '%USERPROFILE%\\.gemini\\antigravity-cli\\settings.json',
+      script_path: '%LOCALAPPDATA%\\STXICHalo\\integrations\\antigravity-statusline.ps1',
+      backup_exists: false,
+      message: 'Open the desktop app to enable the Antigravity CLI status line.',
+    };
+  }
+  return invoke<ClaudeStatuslineStatus>('check_antigravity_statusline_status');
+}
+
+export async function enableAntigravityStatusline(): Promise<ClaudeStatuslineStatus> {
+  if (!isTauri()) throw new Error('Open the desktop app to enable the Antigravity CLI status line.');
+  return invoke<ClaudeStatuslineStatus>('enable_antigravity_statusline');
+}
+
+export async function disableAntigravityStatusline(): Promise<ClaudeStatuslineStatus> {
+  if (!isTauri()) throw new Error('Open the desktop app to disable the Antigravity CLI status line.');
+  return invoke<ClaudeStatuslineStatus>('disable_antigravity_statusline');
 }
 
 export type RetentionPreview = { files: number; bytes: number; errors: number };

@@ -1,13 +1,14 @@
 # Halo feature plan
 
-## Implementation checkpoint — 2026-10-28
+## Implementation checkpoint — 2026-11-24
 
-- Claude quota: a manually configured status-line capture is available in Settings. It prepares a Halo-owned script and does not modify existing Claude configuration. Real Claude Code compatibility remains to be tested.
-- Data: Settings describes local sources and offers an explicit preview and cleanup of aged Halo-generated session snapshots and the rotated activity backup. It does not provide automatic retention or delete provider-owned data.
-- Activity: provider and event filters persist locally and can be cleared.
-- Notifications: optional per-provider desktop alerts with fixed quiet hours, deduplication by reset window, and fresh quota requirements are implemented. Real Windows delivery and packaged Store behavior remain to be tested.
-- Codex: version `0.164.0-alpha.11.1` was observed on the development machine. App-server authentication remains unimplemented because the owner intends to distribute to friends and potentially the Microsoft Store; distribution and authentication eligibility must be confirmed with OpenAI first. Listing in a store does not establish provider permission.
-- Interface: overview and settings styling refined; browser preview checked. Native window and accessibility verification remain outstanding.
+- **One-click Claude Code CLI `statusLine`:** Safely checks `%USERPROFILE%\.claude\settings.json`, saves a `.halo-statusline-bak` backup, and installs or removes Halo's local `claude-statusline.ps1` script in one click when unset. Never overwrites an existing custom `statusLine` (falls back to manual JSON).
+- **One-click Antigravity CLI (`agy`) `statusLine`:** Uses `agy`'s documented `statusLine` in `%USERPROFILE%\.gemini\antigravity-cli\settings.json` with `"stack_with_default": true` (preserving `agy`'s built-in status bar), automatic backup, and custom-config protection. Captures `quota` (`remaining_fraction`, `reset_time`/`reset_in_seconds`), `context_window` tokens, and `cost.total_usd` into `%LOCALAPPDATA%\STXICHalo\usage\antigravity-statusline\*.json` with zero credentials and zero network calls.
+- **Persistent pill rings & multi-provider hover preview:** Retains recently completed sessions (within 1 hour) and token/context-reporting providers in the notch pill after `Stop`/`SessionEnd`, displays top providers side-by-side in hover preview when 2+ providers have usage, and clarifies in Settings & Overview that live `%` quota rings come from interactive CLI sessions (`claude` / `agy` via one-click status line, or `codex` automatically) while Desktop/IDE sessions report tokens only.
+- **Auto-hide peek bar & MSIX Store packaging:** Adds `auto_hide_on_maximized` (120×5 top-edge peek bar over maximized windows with urgent-alert override) and local Windows SDK MSIX packaging (`scripts/package-msix.ps1`).
+- **Data, Activity & Notifications:** Settings describes local sources and offers explicit preview/cleanup (including Halo's local status-line directories) without deleting provider-owned data. Activity filters persist locally, and optional per-provider desktop alerts respect quiet hours, reset-window deduplication, and fresh-quota checks.
+- **Codex note:** App-server authentication remains unimplemented; distribution and authentication eligibility must be confirmed with OpenAI before enabling any authenticated Codex integration.
+- **Interface & verification:** Frontend (`vitest`, `tsc`, `vite build`), Rust (`cargo test`), PowerShell smoke tests, and native Windows MSIX/NSIS packaging have been verified locally.
 
 This plan prioritizes useful, transparent monitoring using documented integrations. Availability and provider terms must be rechecked before each integration ships. Halo must not reuse provider OAuth credentials, impersonate clients, scrape undocumented endpoints, or bypass limits.
 

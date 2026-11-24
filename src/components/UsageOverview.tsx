@@ -32,8 +32,8 @@ export const UsageOverview = memo(function UsageOverview({ agents, result }: { a
 
 const missingReadings = {
   codex: { quota: 'No quota snapshot in the local Codex logs yet.', session: 'Start a Codex task with the log adapter enabled to receive token totals.' },
-  'claude-code': { quota: 'Claude quota can be supplied by the optional status line in Settings. No recent reading is available.', session: 'Claude lifecycle hooks report activity only. Tokens and cost need a separate usage source.' },
-  antigravity: { quota: 'Antigravity hooks do not report quota. Check /usage in Antigravity for your account limits.', session: 'Antigravity hooks report activity only; token totals and cost are not included.' },
+  'claude-code': { quota: 'Claude quota can be supplied by the optional status line in Settings (one-click). Works in interactive Claude Code CLI; Claude Desktop reports tokens only.', session: 'Claude lifecycle hooks report activity only. Tokens and cost come from local session logs or the CLI status line.' },
+  antigravity: { quota: 'Enable the one-click Antigravity CLI (agy) status line in Settings for live % quota. Antigravity Desktop/IDE reports tokens only. Check /usage in Antigravity for account limits.', session: 'Antigravity hooks report activity; token totals come from local transcripts or the agy CLI status line.' },
   'github-copilot': { quota: 'Copilot session logs do not provide account allowance. Check /usage in Copilot.', session: 'Enable Copilot local usage logs in Settings. Totals appear after CLI checkpoints or shutdown.' },
   opencode: { quota: 'OpenCode does not publish account quota through this plugin. Check your model provider’s usage page.', session: 'Connect OpenCode in Settings, then finish a turn to publish tokens and reported cost.' },
 };

@@ -169,6 +169,58 @@ describe('computeActiveProviderRings', () => {
     expect(rings[0].detail).toBe('Codex: 5-hour 10% left · 1-week 69% left · 187k tokens');
     expect(rings[0].previewSummary).toBe('Codex · 5h 10% · 1w 69% · 187k tokens');
   });
+
+  it('keeps recently completed sessions and token-only reports visible in the notch pill after a chat finishes', () => {
+    const observed = '2026-11-23T14:50:30Z';
+    const finishedAgents = [
+      makeAgent({
+        id: 'ag-done',
+        provider: 'antigravity',
+        status: 'completed',
+        liveness: 'exited',
+        lastSeen: observed,
+        tokenUsage: 95_000,
+        usageObservedAt: observed,
+      }),
+      makeAgent({
+        id: 'cx-done',
+        provider: 'codex',
+        status: 'completed',
+        liveness: 'exited',
+        lastSeen: '2026-11-23T14:49:00Z',
+        contextTokens: 50_000,
+        contextWindow: 200_000,
+      }),
+    ];
+
+    const rings = computeActiveProviderRings(finishedAgents, [], now);
+    expect(rings.map((r) => r.provider)).toEqual(['antigravity', 'codex']);
+    expect(rings[0].metric).toBe('tokens');
+    expect(rings[0].tokenLabel).toBe('95k');
+    expect(rings[0].previewSummary).toBe('Antigravity · 95k tokens');
+    expect(rings[1].metric).toBe('context');
+    expect(rings[1].percentRemaining).toBe(75);
+  });
+
+  it('keeps a provider ring visible from token-only usage reports even when no agent is currently active', () => {
+    const observed = '2026-11-23T14:50:30Z';
+    const reports: ProviderUsageReport[] = [
+      {
+        schema_version: 1,
+        provider: 'claude-code',
+        source: 'session-log',
+        sessions: [{ session_id: 'cl-1', total_tokens: 64_000, cost_usd: null, observed_at: observed }],
+        quotas: [],
+      },
+    ];
+
+    const rings = computeActiveProviderRings([], reports, now);
+    expect(rings).toHaveLength(1);
+    expect(rings[0].provider).toBe('claude-code');
+    expect(rings[0].metric).toBe('tokens');
+    expect(rings[0].tokenLabel).toBe('64k');
+    expect(rings[0].previewSummary).toBe('Claude · 64k tokens');
+  });
 });
 
 describe('PillUsageRing component', () => {

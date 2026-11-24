@@ -543,6 +543,15 @@ fn collect_usage_reports(read_copilot: bool, read_codex: bool) -> Result<UsageRe
         &mut cache,
         &mut result,
     );
+    collect_recent_json_reports(
+        &root.join("antigravity-statusline"),
+        "antigravity",
+        UsageSource::Statusline,
+        64,
+        16,
+        &mut cache,
+        &mut result,
+    );
     Ok(result)
 }
 
@@ -557,15 +566,442 @@ pub async fn read_usage_reports(settings: State<'_, Mutex<UserSettings>>) -> Res
         .map_err(|e| format!("Usage reader worker failed: {e}"))?
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ClaudeStatuslineState {
+    NotConfigured,
+    HaloConfigured,
+    CustomConfigured,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClaudeStatuslineStatus {
+    pub state: ClaudeStatuslineState,
+    pub command: String,
+    pub config_path: String,
+    pub script_path: String,
+    pub backup_exists: bool,
+    pub message: String,
+}
+
+fn claude_settings_path() -> Result<PathBuf, String> {
+    let home = env::var_os("USERPROFILE")
+        .or_else(|| env::var_os("HOME"))
+        .map(PathBuf::from)
+        .ok_or_else(|| "Cannot resolve user home directory".to_string())?;
+    Ok(home.join(".claude").join("settings.json"))
+}
+
+fn claude_statusline_script_path() -> Result<PathBuf, String> {
+    Ok(crate::paths::ensure_app_data_dir()?
+        .join("integrations")
+        .join("claude-statusline.ps1"))
+}
+
+fn claude_statusline_command(script: &Path) -> String {
+    format!(
+        "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{}\"",
+        script.display()
+    )
+}
+
+fn materialize_claude_statusline_script(script: &Path) -> Result<(), String> {
+    if let Some(parent) = script.parent() {
+        fs::create_dir_all(parent).map_err(|_| "Cannot create integrations directory")?;
+    }
+    fs::write(script, include_str!("../../scripts/claude-statusline.ps1"))
+        .map_err(|_| "Cannot write Halo status-line script")?;
+    Ok(())
+}
+
+fn classify_claude_statusline(config: &serde_json::Value) -> ClaudeStatuslineState {
+    match config.get("statusLine") {
+        None | Some(serde_json::Value::Null) => ClaudeStatuslineState::NotConfigured,
+        Some(serde_json::Value::Object(map)) => {
+            let is_halo = map
+                .get("command")
+                .and_then(|v| v.as_str())
+                .is_some_and(|cmd| cmd.to_ascii_lowercase().contains("claude-statusline.ps1"));
+            if is_halo {
+                ClaudeStatuslineState::HaloConfigured
+            } else {
+                ClaudeStatuslineState::CustomConfigured
+            }
+        }
+        Some(_) => ClaudeStatuslineState::CustomConfigured,
+    }
+}
+
+fn read_claude_settings_object(settings_path: &Path) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    if !settings_path.exists() {
+        return Ok(serde_json::Map::new());
+    }
+    let raw = fs::read_to_string(settings_path)
+        .map_err(|_| "Cannot read Claude settings.json".to_string())?;
+    if raw.trim().is_empty() {
+        return Ok(serde_json::Map::new());
+    }
+    let parsed: serde_json::Value = serde_json::from_str(&raw)
+        .map_err(|_| "Claude settings.json is not valid JSON; edit it manually.".to_string())?;
+    match parsed {
+        serde_json::Value::Object(map) => Ok(map),
+        _ => Err("Claude settings.json root is not a JSON object; edit it manually.".to_string()),
+    }
+}
+
+fn write_json_atomic(path: &Path, value: &serde_json::Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|_| "Cannot create Claude settings directory")?;
+    }
+    let formatted = serde_json::to_string_pretty(value)
+        .map_err(|_| "Failed to serialize Claude settings.json")?;
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let tmp = path.with_extension(format!("json.{}-{}.tmp", std::process::id(), nanos));
+    fs::write(&tmp, formatted.as_bytes())
+        .map_err(|_| "Cannot write temporary Claude settings file")?;
+    if let Err(_) = fs::rename(&tmp, path) {
+        // Fallback for Windows when replacing an existing file across certain FS semantics
+        fs::copy(&tmp, path).map_err(|_| {
+            let _ = fs::remove_file(&tmp);
+            "Cannot update Claude settings.json".to_string()
+        })?;
+        let _ = fs::remove_file(&tmp);
+    }
+    Ok(())
+}
+
+fn statusline_backup_path(settings_path: &Path) -> PathBuf {
+    PathBuf::from(format!("{}.halo-statusline-bak", settings_path.display()))
+}
+
+fn check_claude_statusline_at(settings_path: &Path, script: &Path) -> Result<ClaudeStatuslineStatus, String> {
+    let command = claude_statusline_command(script);
+    let backup_exists = statusline_backup_path(settings_path).exists();
+    let map = read_claude_settings_object(settings_path)?;
+    let state = classify_claude_statusline(&serde_json::Value::Object(map));
+    let message = match state {
+        ClaudeStatuslineState::NotConfigured => {
+            "Claude status line is not configured yet. Click Enable to set it up safely."
+        }
+        ClaudeStatuslineState::HaloConfigured => {
+            "Halo status line is enabled in Claude Code settings."
+        }
+        ClaudeStatuslineState::CustomConfigured => {
+            "An existing custom statusLine was detected. Halo will not overwrite it."
+        }
+    }
+    .to_string();
+    Ok(ClaudeStatuslineStatus {
+        state,
+        command,
+        config_path: settings_path.display().to_string(),
+        script_path: script.display().to_string(),
+        backup_exists,
+        message,
+    })
+}
+
+fn enable_claude_statusline_at(settings_path: &Path, script: &Path) -> Result<ClaudeStatuslineStatus, String> {
+    materialize_claude_statusline_script(script)?;
+    let command = claude_statusline_command(script);
+    let mut map = read_claude_settings_object(settings_path)?;
+    let current = classify_claude_statusline(&serde_json::Value::Object(map.clone()));
+    if current == ClaudeStatuslineState::CustomConfigured {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::CustomConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: statusline_backup_path(settings_path).exists(),
+            message: "Custom statusLine detected in Claude settings.json. Halo left it untouched; integrate manually to preserve yours.".to_string(),
+        });
+    }
+    let backup = statusline_backup_path(settings_path);
+    if settings_path.exists() {
+        fs::copy(settings_path, &backup)
+            .map_err(|_| "Cannot back up Claude settings.json before enabling status line")?;
+    }
+    map.insert(
+        "statusLine".to_string(),
+        serde_json::json!({
+            "type": "command",
+            "command": command,
+        }),
+    );
+    write_json_atomic(settings_path, &serde_json::Value::Object(map))?;
+    Ok(ClaudeStatuslineStatus {
+        state: ClaudeStatuslineState::HaloConfigured,
+        command,
+        config_path: settings_path.display().to_string(),
+        script_path: script.display().to_string(),
+        backup_exists: backup.exists(),
+        message: "Claude status line enabled. Restart Claude Code to report 5-hour and 1-week quota.".to_string(),
+    })
+}
+
+fn disable_claude_statusline_at(settings_path: &Path, script: &Path) -> Result<ClaudeStatuslineStatus, String> {
+    let command = claude_statusline_command(script);
+    let backup = statusline_backup_path(settings_path);
+    if !settings_path.exists() {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::NotConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: backup.exists(),
+            message: "Claude settings.json does not exist; status line is already disabled.".to_string(),
+        });
+    }
+    let mut map = read_claude_settings_object(settings_path)?;
+    let current = classify_claude_statusline(&serde_json::Value::Object(map.clone()));
+    if current == ClaudeStatuslineState::CustomConfigured {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::CustomConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: backup.exists(),
+            message: "Custom statusLine belongs to another tool; Halo left it untouched.".to_string(),
+        });
+    }
+    if current == ClaudeStatuslineState::NotConfigured {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::NotConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: backup.exists(),
+            message: "Claude status line is already disabled.".to_string(),
+        });
+    }
+    fs::copy(settings_path, &backup)
+        .map_err(|_| "Cannot back up Claude settings.json before disabling status line")?;
+    map.remove("statusLine");
+    write_json_atomic(settings_path, &serde_json::Value::Object(map))?;
+    Ok(ClaudeStatuslineStatus {
+        state: ClaudeStatuslineState::NotConfigured,
+        command,
+        config_path: settings_path.display().to_string(),
+        script_path: script.display().to_string(),
+        backup_exists: backup.exists(),
+        message: "Claude status line disabled. Restart Claude Code to finish disconnecting.".to_string(),
+    })
+}
+
 /// Only prepares Halo's script. The user chooses whether and how to configure Claude Code.
 #[tauri::command]
 pub fn prepare_claude_statusline() -> Result<String, String> {
-    let root = crate::paths::ensure_app_data_dir()?.join("integrations");
-    std::fs::create_dir_all(&root).map_err(|_| "Cannot create integrations directory")?;
-    let script = root.join("claude-statusline.ps1");
-    std::fs::write(&script, include_str!("../../scripts/claude-statusline.ps1"))
-        .map_err(|_| "Cannot write Halo status-line script")?;
-    Ok(format!("powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"{}\"", script.display()))
+    let script = claude_statusline_script_path()?;
+    materialize_claude_statusline_script(&script)?;
+    Ok(claude_statusline_command(&script))
+}
+
+#[tauri::command]
+pub fn check_claude_statusline_status() -> Result<ClaudeStatuslineStatus, String> {
+    let settings_path = claude_settings_path()?;
+    let script = claude_statusline_script_path()?;
+    check_claude_statusline_at(&settings_path, &script)
+}
+
+#[tauri::command]
+pub fn enable_claude_statusline() -> Result<ClaudeStatuslineStatus, String> {
+    let settings_path = claude_settings_path()?;
+    let script = claude_statusline_script_path()?;
+    enable_claude_statusline_at(&settings_path, &script)
+}
+
+#[tauri::command]
+pub fn disable_claude_statusline() -> Result<ClaudeStatuslineStatus, String> {
+    let settings_path = claude_settings_path()?;
+    let script = claude_statusline_script_path()?;
+    disable_claude_statusline_at(&settings_path, &script)
+}
+
+fn antigravity_settings_path() -> Result<PathBuf, String> {
+    let home = env::var_os("USERPROFILE")
+        .or_else(|| env::var_os("HOME"))
+        .map(PathBuf::from)
+        .ok_or_else(|| "Cannot resolve user home directory".to_string())?;
+    Ok(home.join(".gemini").join("antigravity-cli").join("settings.json"))
+}
+
+fn antigravity_statusline_script_path() -> Result<PathBuf, String> {
+    Ok(crate::paths::ensure_app_data_dir()?
+        .join("integrations")
+        .join("antigravity-statusline.ps1"))
+}
+
+fn materialize_antigravity_statusline_script(script: &Path) -> Result<(), String> {
+    if let Some(parent) = script.parent() {
+        fs::create_dir_all(parent).map_err(|_| "Cannot create integrations directory")?;
+    }
+    fs::write(script, include_str!("../../scripts/antigravity-statusline.ps1"))
+        .map_err(|_| "Cannot write Halo Antigravity status-line script")?;
+    Ok(())
+}
+
+fn classify_antigravity_statusline(config: &serde_json::Value) -> ClaudeStatuslineState {
+    match config.get("statusLine") {
+        None | Some(serde_json::Value::Null) => ClaudeStatuslineState::NotConfigured,
+        Some(serde_json::Value::Object(map)) => {
+            let is_halo = map
+                .get("command")
+                .and_then(|v| v.as_str())
+                .is_some_and(|cmd| cmd.to_ascii_lowercase().contains("antigravity-statusline.ps1"));
+            if is_halo {
+                ClaudeStatuslineState::HaloConfigured
+            } else {
+                ClaudeStatuslineState::CustomConfigured
+            }
+        }
+        Some(_) => ClaudeStatuslineState::CustomConfigured,
+    }
+}
+
+fn check_antigravity_statusline_at(settings_path: &Path, script: &Path) -> Result<ClaudeStatuslineStatus, String> {
+    let command = claude_statusline_command(script);
+    let backup_exists = statusline_backup_path(settings_path).exists();
+    let map = read_claude_settings_object(settings_path)?;
+    let state = classify_antigravity_statusline(&serde_json::Value::Object(map));
+    let message = match state {
+        ClaudeStatuslineState::NotConfigured => {
+            "Antigravity CLI status line is not configured yet. Click Enable to set it up safely (keeps your built-in bar)."
+        }
+        ClaudeStatuslineState::HaloConfigured => {
+            "Halo status line is enabled in Antigravity CLI settings."
+        }
+        ClaudeStatuslineState::CustomConfigured => {
+            "An existing custom statusLine was detected in Antigravity CLI settings. Halo will not overwrite it."
+        }
+    }
+    .to_string();
+    Ok(ClaudeStatuslineStatus {
+        state,
+        command,
+        config_path: settings_path.display().to_string(),
+        script_path: script.display().to_string(),
+        backup_exists,
+        message,
+    })
+}
+
+fn enable_antigravity_statusline_at(settings_path: &Path, script: &Path) -> Result<ClaudeStatuslineStatus, String> {
+    materialize_antigravity_statusline_script(script)?;
+    let command = claude_statusline_command(script);
+    let mut map = read_claude_settings_object(settings_path)?;
+    let current = classify_antigravity_statusline(&serde_json::Value::Object(map.clone()));
+    if current == ClaudeStatuslineState::CustomConfigured {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::CustomConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: statusline_backup_path(settings_path).exists(),
+            message: "Custom statusLine detected in Antigravity CLI settings.json. Halo left it untouched.".to_string(),
+        });
+    }
+    let backup = statusline_backup_path(settings_path);
+    if settings_path.exists() {
+        fs::copy(settings_path, &backup)
+            .map_err(|_| "Cannot back up Antigravity CLI settings.json before enabling status line")?;
+    }
+    map.insert(
+        "statusLine".to_string(),
+        serde_json::json!({
+            "type": "command",
+            "command": command,
+            "stack_with_default": true,
+        }),
+    );
+    write_json_atomic(settings_path, &serde_json::Value::Object(map))?;
+    Ok(ClaudeStatuslineStatus {
+        state: ClaudeStatuslineState::HaloConfigured,
+        command,
+        config_path: settings_path.display().to_string(),
+        script_path: script.display().to_string(),
+        backup_exists: backup.exists(),
+        message: "Antigravity CLI status line enabled (with stack_with_default). Start or restart agy to report live quota.".to_string(),
+    })
+}
+
+fn disable_antigravity_statusline_at(settings_path: &Path, script: &Path) -> Result<ClaudeStatuslineStatus, String> {
+    let command = claude_statusline_command(script);
+    let backup = statusline_backup_path(settings_path);
+    if !settings_path.exists() {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::NotConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: backup.exists(),
+            message: "Antigravity CLI settings.json does not exist; status line is already disabled.".to_string(),
+        });
+    }
+    let mut map = read_claude_settings_object(settings_path)?;
+    let current = classify_antigravity_statusline(&serde_json::Value::Object(map.clone()));
+    if current == ClaudeStatuslineState::CustomConfigured {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::CustomConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: backup.exists(),
+            message: "Custom statusLine belongs to another tool; Halo left it untouched.".to_string(),
+        });
+    }
+    if current == ClaudeStatuslineState::NotConfigured {
+        return Ok(ClaudeStatuslineStatus {
+            state: ClaudeStatuslineState::NotConfigured,
+            command,
+            config_path: settings_path.display().to_string(),
+            script_path: script.display().to_string(),
+            backup_exists: backup.exists(),
+            message: "Antigravity CLI status line is already disabled.".to_string(),
+        });
+    }
+    fs::copy(settings_path, &backup)
+        .map_err(|_| "Cannot back up Antigravity CLI settings.json before disabling status line")?;
+    map.remove("statusLine");
+    write_json_atomic(settings_path, &serde_json::Value::Object(map))?;
+    Ok(ClaudeStatuslineStatus {
+        state: ClaudeStatuslineState::NotConfigured,
+        command,
+        config_path: settings_path.display().to_string(),
+        script_path: script.display().to_string(),
+        backup_exists: backup.exists(),
+        message: "Antigravity CLI status line disabled. Restart agy to finish disconnecting.".to_string(),
+    })
+}
+
+#[tauri::command]
+pub fn prepare_antigravity_statusline() -> Result<String, String> {
+    let script = antigravity_statusline_script_path()?;
+    materialize_antigravity_statusline_script(&script)?;
+    Ok(claude_statusline_command(&script))
+}
+
+#[tauri::command]
+pub fn check_antigravity_statusline_status() -> Result<ClaudeStatuslineStatus, String> {
+    let settings_path = antigravity_settings_path()?;
+    let script = antigravity_statusline_script_path()?;
+    check_antigravity_statusline_at(&settings_path, &script)
+}
+
+#[tauri::command]
+pub fn enable_antigravity_statusline() -> Result<ClaudeStatuslineStatus, String> {
+    let settings_path = antigravity_settings_path()?;
+    let script = antigravity_statusline_script_path()?;
+    enable_antigravity_statusline_at(&settings_path, &script)
+}
+
+#[tauri::command]
+pub fn disable_antigravity_statusline() -> Result<ClaudeStatuslineStatus, String> {
+    let settings_path = antigravity_settings_path()?;
+    let script = antigravity_statusline_script_path()?;
+    disable_antigravity_statusline_at(&settings_path, &script)
 }
 
 #[cfg(test)]
@@ -689,5 +1125,79 @@ mod tests {
         assert_eq!(report.quotas.len(), 2);
         assert!(report.quotas.iter().any(|q| q.label == "5-hour" && q.window_minutes == Some(300)));
         assert!(report.quotas.iter().any(|q| q.label == "1-week" && q.window_minutes == Some(10_080)));
+    }
+
+    #[test]
+    fn claude_statusline_enable_disable_preserves_other_settings_and_never_overwrites_custom() {
+        let dir = std::env::temp_dir().join(format!("halo-statusline-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let settings = dir.join("settings.json");
+        let script = dir.join("integrations").join("claude-statusline.ps1");
+
+        // 1. Existing settings without statusLine -> enables safely and preserves existing keys
+        fs::write(&settings, r#"{"hooks":{"Stop":[]},"theme":"dark"}"#).unwrap();
+        let initial = check_claude_statusline_at(&settings, &script).unwrap();
+        assert_eq!(initial.state, ClaudeStatuslineState::NotConfigured);
+
+        let enabled = enable_claude_statusline_at(&settings, &script).unwrap();
+        assert_eq!(enabled.state, ClaudeStatuslineState::HaloConfigured);
+        assert!(enabled.backup_exists);
+        assert!(script.exists());
+        let saved: serde_json::Value = serde_json::from_str(&fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(saved["theme"], "dark");
+        assert!(saved["hooks"].is_object());
+        assert!(saved["statusLine"]["command"].as_str().unwrap().contains("claude-statusline.ps1"));
+
+        // 2. Disable removes only statusLine and preserves other keys
+        let disabled = disable_claude_statusline_at(&settings, &script).unwrap();
+        assert_eq!(disabled.state, ClaudeStatuslineState::NotConfigured);
+        let after_disable: serde_json::Value = serde_json::from_str(&fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(after_disable["theme"], "dark");
+        assert!(after_disable.get("statusLine").is_none());
+
+        // 3. Custom statusLine -> neither enable nor disable modifies it
+        fs::write(&settings, r#"{"statusLine":{"type":"command","command":"my-custom-status.sh"},"theme":"dark"}"#).unwrap();
+        let custom_enable = enable_claude_statusline_at(&settings, &script).unwrap();
+        assert_eq!(custom_enable.state, ClaudeStatuslineState::CustomConfigured);
+        let custom_disable = disable_claude_statusline_at(&settings, &script).unwrap();
+        assert_eq!(custom_disable.state, ClaudeStatuslineState::CustomConfigured);
+        let untouched: serde_json::Value = serde_json::from_str(&fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(untouched["statusLine"]["command"], "my-custom-status.sh");
+
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn antigravity_statusline_enable_disable_sets_stack_with_default_and_preserves_custom() {
+        let dir = std::env::temp_dir().join(format!("halo-agy-statusline-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let settings = dir.join("settings.json");
+        let script = dir.join("integrations").join("antigravity-statusline.ps1");
+
+        fs::write(&settings, r#"{"verbosity":"medium"}"#).unwrap();
+        let enabled = enable_antigravity_statusline_at(&settings, &script).unwrap();
+        assert_eq!(enabled.state, ClaudeStatuslineState::HaloConfigured);
+        assert!(enabled.backup_exists);
+        assert!(script.exists());
+        let saved: serde_json::Value = serde_json::from_str(&fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(saved["verbosity"], "medium");
+        assert_eq!(saved["statusLine"]["stack_with_default"], true);
+        assert!(saved["statusLine"]["command"].as_str().unwrap().contains("antigravity-statusline.ps1"));
+
+        let disabled = disable_antigravity_statusline_at(&settings, &script).unwrap();
+        assert_eq!(disabled.state, ClaudeStatuslineState::NotConfigured);
+        let after_disable: serde_json::Value = serde_json::from_str(&fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(after_disable["verbosity"], "medium");
+        assert!(after_disable.get("statusLine").is_none());
+
+        fs::write(&settings, r#"{"statusLine":{"type":"command","command":"my-agy-status.sh"}}"#).unwrap();
+        let custom = enable_antigravity_statusline_at(&settings, &script).unwrap();
+        assert_eq!(custom.state, ClaudeStatuslineState::CustomConfigured);
+        let untouched: serde_json::Value = serde_json::from_str(&fs::read_to_string(&settings).unwrap()).unwrap();
+        assert_eq!(untouched["statusLine"]["command"], "my-agy-status.sh");
+
+        let _ = fs::remove_dir_all(&dir);
     }
 }

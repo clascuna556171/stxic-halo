@@ -20,6 +20,7 @@ import { ProviderConnections } from './components/ProviderConnections';
 import { ProviderIcon } from './components/ProviderIcon';
 import { computeActiveProviderRings, PillUsageRing } from './components/PillUsageRings';
 import { ClaudeStatuslineSetup } from './components/ClaudeStatuslineSetup';
+import { AntigravityStatuslineSetup } from './components/AntigravityStatuslineSetup';
 import { DataControls } from './components/DataControls';
 import { useQuotaNotifications, QuotaNotificationSettings } from './components/QuotaNotifications';
 import { ConnectionHealth } from './components/ConnectionHealth';
@@ -261,6 +262,7 @@ const SettingsView = memo(function SettingsView({
       <div className="settings-card notification-preferences"><QuotaNotificationSettings /></div>
       <div className="settings-card health-preferences"><ConnectionHealth agents={agents} claudeHookStatus={claudeHookStatus} codexLogsEnabled={settings.enable_codex_logs !== false} /></div>
       <ClaudeStatuslineSetup />
+      <AntigravityStatuslineSetup />
       <DataControls />
       <div className="section-heading"><h2>More coding agents</h2><span className="subtle-label">Opt-in connections</span></div>
       <div className="settings-card"><ProviderConnections /></div>
@@ -830,6 +832,7 @@ export default function App() {
               <span className="token-preview-body" aria-hidden={!preview}>
                 {(() => {
                   const quotaRings = pillRings.filter((r) => r.metric === 'quota');
+                  const informativeRings = pillRings.filter((r) => r.metric !== 'none');
                   const fallbackRing = pillRings.find((r) => r.percentRemaining !== null) ?? pillRings.find((r) => r.tokenLabel !== null);
                   if (quotaRings.length >= 2) {
                     return (
@@ -841,6 +844,15 @@ export default function App() {
                   }
                   const primaryQuota = quotaRings[0];
                   if (primaryQuota) {
+                    const secondaryRing = informativeRings.find((r) => r.provider !== primaryQuota.provider);
+                    if (secondaryRing) {
+                      return (
+                        <>
+                          <span className="token-preview-value tabular">{primaryQuota.previewSummary}</span>
+                          <span className="token-preview-detail tabular">{secondaryRing.previewSummary}</span>
+                        </>
+                      );
+                    }
                     const detailParts: string[] = [];
                     if (primaryQuota.totalTokens !== null) {
                       detailParts.push(`${primaryQuota.totalTokens.toLocaleString()} tokens`);
@@ -852,6 +864,14 @@ export default function App() {
                       <>
                         <span className="token-preview-value tabular">{primaryQuota.previewSummary}</span>
                         <span className="token-preview-detail tabular">{detailParts.join(' · ')}</span>
+                      </>
+                    );
+                  }
+                  if (informativeRings.length >= 2) {
+                    return (
+                      <>
+                        <span className="token-preview-value tabular">{informativeRings[0].previewSummary}</span>
+                        <span className="token-preview-detail tabular">{informativeRings[1].previewSummary}</span>
                       </>
                     );
                   }
@@ -869,7 +889,9 @@ export default function App() {
                         {budget
                           ? `${leadWorkingAgent ? 'Context' : 'Last report'} · ${relativeTime(previewAgent!.lastSeen)}`
                           : fallbackRing
-                            ? 'Live provider usage'
+                            ? fallbackRing.activeCount > 0
+                              ? 'Live provider usage'
+                              : 'Last session usage'
                             : 'Waiting for 5h/1w quota & token data'}
                       </span>
                     </>

@@ -1,8 +1,17 @@
 # Changelog
 
-## 0.1.0 — Pre-Release (2026-11-23)
+## 0.1.0 — Pre-Release (2026-11-24)
 
-### Release & Desktop Hardening
+### CLI Status Lines & Persistent Usage Rings
+- Add one-click Claude Code CLI `statusLine` Enable/Disable (`src-tauri/src/usage.rs`, `ClaudeStatuslineSetup.tsx`): checks `%USERPROFILE%\.claude\settings.json`, backs up to `.halo-statusline-bak`, installs/removes `claude-statusline.ps1` cleanly, and refuses to overwrite existing custom `statusLine` commands.
+- Add one-click Antigravity CLI (`agy`) `statusLine` Enable/Disable (`scripts/antigravity-statusline.ps1`, `AntigravityStatuslineSetup.tsx`, `retention.rs`): configures `%USERPROFILE%\.gemini\antigravity-cli\settings.json` with `"stack_with_default": true`, automatic backup, and custom-config protection, capturing local-only `quota`, `context_window` tokens, and `cost.total_usd` under `%LOCALAPPDATA%\STXICHalo\usage\antigravity-statusline\*.json` (covered by local retention cleanup).
+- Retain recently completed sessions (within 1 hour) and token/context providers in the notch pill (`PillUsageRings.tsx`, `App.tsx`), show top multiple providers in hover preview when 2+ providers have usage, and clarify in Settings & Overview that live `%` quota rings come from interactive CLI sessions (`claude` / `agy` / `codex`) while Desktop/IDE sessions report tokens only.
+
+### Auto-Hide Peek Bar & Microsoft Store Packaging
+- Add `auto_hide_on_maximized` (settings schema v4) with Win32 maximized/fullscreen foreground detection and a `120×5` top-edge peek strip that reveals on hover/`Alt+H` and pops open automatically on urgent alerts (`Approval required` / `Test fail`).
+- Add Microsoft Store MSIX packaging pipeline (`scripts/package-msix.ps1`, `src-tauri/msix/AppxManifest.template.xml`, `desktop:build:msix`) and updated privacy/release documentation.
+
+### Release & Desktop Hardening (2026-11-23)
 - Embed `manage-claude-hook.ps1` and `claude-hook.ps1` directly into the Rust binary and materialize them into `%LOCALAPPDATA%\STXICHalo\integrations\`, so standalone `.exe` and NSIS/MSI installs work outside the dev repository.
 - Suppress console window flashes (`CREATE_NO_WINDOW`) when spawning PowerShell, Git, and allowlisted test runners from release GUI builds.
 - Gate permission mailbox polling on active Claude Code hook installation so idle/non-Claude setups respect deep-sleep backoff without background disk writes.

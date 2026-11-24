@@ -523,6 +523,13 @@ pub fn run() {
             providers::set_provider_connection,
             usage::read_usage_reports,
             usage::prepare_claude_statusline,
+            usage::check_claude_statusline_status,
+            usage::enable_claude_statusline,
+            usage::disable_claude_statusline,
+            usage::prepare_antigravity_statusline,
+            usage::check_antigravity_statusline_status,
+            usage::enable_antigravity_statusline,
+            usage::disable_antigravity_statusline,
             retention::preview_halo_retention,
             retention::clean_halo_retention,
         ])

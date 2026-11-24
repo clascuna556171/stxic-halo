@@ -82,7 +82,7 @@ export function providerUsage(provider: Provider, agents: readonly Agent[], repo
   };
   for (const report of reports.filter(r => r.schema_version === 1 && r.provider === provider)) {
     const source = report.source === 'session-log' ? 'Session log' : report.source === 'plugin' ? 'Local plugin'
-      : report.source === 'statusline' ? 'Claude status line' : provider === 'opencode' ? 'Local plugin/export' : 'Local export';
+      : report.source === 'statusline' ? (provider === 'antigravity' ? 'Antigravity status line' : 'Claude status line') : provider === 'opencode' ? 'Local plugin/export' : 'Local export';
     report.sessions.forEach(s => addSession(s, source));
     report.quotas.forEach(q => addQuota(q, source));
   }
