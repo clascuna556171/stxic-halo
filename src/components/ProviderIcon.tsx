@@ -1,5 +1,6 @@
 import { Bot } from 'lucide-react';
 import { siClaudecode, siGithubcopilot, siOpencode } from 'simple-icons';
+import antigravityIcon from '../assets/antigravity-icon.png';
 import type { Provider } from '../types';
 
 const paths: Partial<Record<Provider, string>> = {
@@ -19,9 +20,7 @@ export function ProviderIcon({ provider }: { provider: Provider }) {
         </svg>
       )
       : provider === 'antigravity' ? (
-        <svg viewBox="0 0 24 24" focusable="false">
-          <path d="M12 3L4.5 20h3.3l1.6-3.8h5.2l1.6 3.8h3.3L12 3zm0 5.4l1.7 4.4h-3.4L12 8.4z" fill="currentColor" />
-        </svg>
+        <img src={antigravityIcon} alt="" className="provider-icon-img" draggable={false} />
       )
       : <Bot size={15} />}
   </span>;

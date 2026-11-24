@@ -1768,7 +1768,8 @@ html:has(.browser-help) .collapsed-pill {
 /* Provider marks complement their text labels and do not carry status. */
 .provider-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .provider-icon { display: inline-flex; flex: 0 0 24px; width: 24px; height: 24px; align-items: center; justify-content: center; border: 1px solid var(--stroke); border-radius: 7px; background: var(--stroke-subtle); color: var(--text); font-size: 12px; font-weight: 700; line-height: 1; }
-.provider-icon svg { width: 15px; height: 15px; }
+.provider-icon svg,
+.provider-icon img { width: 15px; height: 15px; display: block; object-fit: contain; }
 .usage-provider-heading { align-items: center; }
 .activity-timeline .provider-icon { margin-top: 1px; }
 
@@ -2087,7 +2088,8 @@ html:has(.browser-help) .collapsed-pill {
   color: inherit;
 }
 
-.pill-ring-icon .provider-icon svg {
+.pill-ring-icon .provider-icon svg,
+.pill-ring-icon .provider-icon img {
   width: 11px;
   height: 11px;
 }

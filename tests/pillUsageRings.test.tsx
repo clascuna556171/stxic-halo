@@ -203,4 +203,16 @@ describe('PillUsageRing component', () => {
     expect(rightHtml).toContain('pill-ring--align-right');
     expect(rightHtml.indexOf('>45%<')).toBeLessThan(rightHtml.indexOf('pill-ring-gauge'));
   });
+
+  it('renders the custom image icon inside the ring for Antigravity', () => {
+    const [ring] = computeActiveProviderRings(
+      [makeAgent({ id: 'ag-1', provider: 'antigravity', tokenUsage: 42_000, usageObservedAt: observed })],
+      [],
+      now,
+    );
+    const html = renderToStaticMarkup(<PillUsageRing ring={ring} align="left" />);
+    expect(html).toContain('class="pill-ring-icon"');
+    expect(html).toContain('class="provider-icon-img"');
+    expect(html).toContain('antigravity-icon.png');
+  });
 });
