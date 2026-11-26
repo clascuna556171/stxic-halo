@@ -1,6 +1,6 @@
 [package]
 name = "stxic-halo"
-version = "0.1.0"
+version = "0.1.1"
 description = "STXIC Halo local desktop companion"
 authors = ["STXIC"]
 edition = "2021"

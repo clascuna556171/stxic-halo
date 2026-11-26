@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — Apple Liquid Glass & Store Polish (2026-11-26)
+
+### Visual & Glassmorphism Refinement
+- Upgrade collapsed notch, hover preview, and expanded HUD shell to Apple Liquid Glass optical styling: directional masked specular rim borders (`::before` gradient stroke), outer dark optical contrast hairline, subtle top glass sheen, and unclipped shadow breathing room.
+- Add Apple-style top/bottom scroll-edge fade masks and thin overlay scrollbars on scrollable HUD panels, plus refined glass highlights on the sliding segmented control.
+- Add `prefers-reduced-transparency: reduce` fallback for high-contrast opaque rendering when Windows Transparency Effects are disabled.
+
 ## 0.1.0 — Pre-Release (2026-11-24)
 
 ### CLI Status Lines & Persistent Usage Rings
