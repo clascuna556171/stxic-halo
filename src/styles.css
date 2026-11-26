@@ -14,29 +14,38 @@
 
   /* Specular Rim Lighting & Optical Hairlines */
   --liquid-glass-rim-gradient: linear-gradient(
-    158deg,
-    rgba(255, 255, 255, 0.34) 0%,
-    rgba(255, 255, 255, 0.14) 24%,
-    rgba(255, 255, 255, 0.06) 52%,
-    rgba(255, 255, 255, 0.16) 82%,
-    rgba(255, 255, 255, 0.26) 100%
+    160deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.13) 26%,
+    rgba(255, 255, 255, 0.06) 54%,
+    rgba(255, 255, 255, 0.14) 82%,
+    rgba(255, 255, 255, 0.24) 100%
+  );
+  --liquid-glass-rim-docked: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.0) 0%,
+    rgba(255, 255, 255, 0.07) 18%,
+    rgba(255, 255, 255, 0.11) 74%,
+    rgba(255, 255, 255, 0.24) 100%
   );
   --liquid-glass-rim-notch: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.08) 0%,
-    rgba(255, 255, 255, 0.16) 55%,
-    rgba(255, 255, 255, 0.30) 100%
+    rgba(255, 255, 255, 0.0) 0%,
+    rgba(255, 255, 255, 0.11) 48%,
+    rgba(255, 255, 255, 0.26) 100%
   );
   --liquid-glass-rim-warning: linear-gradient(
     180deg,
-    rgba(255, 159, 10, 0.22) 0%,
-    rgba(255, 159, 10, 0.42) 60%,
-    rgba(255, 184, 77, 0.62) 100%
+    rgba(255, 159, 10, 0.14) 0%,
+    rgba(255, 159, 10, 0.38) 58%,
+    rgba(255, 184, 77, 0.60) 100%
   );
-  --liquid-glass-outer-ring: 0 0 0 0.5px rgba(0, 0, 0, 0.68);
+  --liquid-glass-outer-ring: 0 0 0 0.5px rgba(0, 0, 0, 0.52);
   --liquid-glass-inner-bevel:
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
-    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.09);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.20),
+    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.10);
+  --liquid-glass-inner-bevel-docked:
+    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.12);
   --liquid-glass-top-rim: inset 0 0.5px 0 0 rgba(255, 255, 255, 0.20);
   --liquid-glass-inner-rim: inset 0 0 0 0.5px rgba(255, 255, 255, 0.09);
   --liquid-glass-border: rgba(255, 255, 255, 0.10);
@@ -167,7 +176,7 @@ code {
   font-family: var(--font-mono);
 }
 
-/* Top-Bezel Zero-Inset Frame with unclipped outer optical gutter */
+/* Top-Bezel Zero-Inset Frame (1px outer optical ring gutter, zero blurred shadow bleed) */
 .app-frame {
   width: 100%;
   height: 100%;
@@ -176,12 +185,12 @@ code {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 0 4px 6px;
+  padding: 0 1px 1px;
 }
 
 .app-frame.collapsed,
 .app-frame.preview {
-  padding: 0 2px 3px;
+  padding: 0 1px 1px;
 }
 
 .app-frame.peek {
@@ -210,9 +219,12 @@ code {
 .notch-center .pill-main { flex: 0 1 auto; justify-content: center; }
 .collapsed-pill.token-preview {
   height: 100%;
-  min-height: 108px;
+  min-height: 110px;
   border-radius: 0 0 22px 22px;
-  box-shadow: var(--liquid-glass-outer-ring), var(--liquid-glass-inner-bevel), var(--notch-shadow);
+  box-shadow: var(--liquid-glass-outer-ring), var(--liquid-glass-inner-bevel-docked);
+}
+.collapsed-pill.floating-bezel.token-preview {
+  box-shadow: var(--liquid-glass-outer-ring), var(--liquid-glass-inner-bevel);
 }
 .collapsed-pill.floating-bezel.token-preview {
   border-radius: 22px;
@@ -340,8 +352,8 @@ code {
 .collapsed-pill {
   position: relative;
   width: 100%;
-  height: 35px;
-  min-height: 35px;
+  height: 37px;
+  min-height: 37px;
   padding: 0 13px;
   border: none;
   border-radius: 0 0 20px 20px;
@@ -356,8 +368,7 @@ code {
   text-align: left;
   box-shadow:
     var(--liquid-glass-outer-ring),
-    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.14),
-    0 2px 6px -1px rgba(0, 0, 0, 0.44);
+    var(--liquid-glass-inner-bevel-docked);
   transform-origin: top center;
   will-change: transform;
   contain: layout paint;
@@ -390,8 +401,7 @@ code {
   border-radius: 20px;
   box-shadow:
     var(--liquid-glass-outer-ring),
-    var(--liquid-glass-inner-bevel),
-    0 3px 10px -2px rgba(0, 0, 0, 0.48);
+    var(--liquid-glass-inner-bevel);
 }
 
 .collapsed-pill.floating-bezel::before {
@@ -407,16 +417,14 @@ code {
   background: var(--liquid-glass-surface-hover);
   box-shadow:
     var(--liquid-glass-outer-ring),
-    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.22),
-    0 4px 10px -2px rgba(0, 0, 0, 0.5);
+    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.20);
 }
 
 .collapsed-pill.floating-bezel:hover {
   box-shadow:
     var(--liquid-glass-outer-ring),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
-    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.14),
-    0 5px 12px -2px rgba(0, 0, 0, 0.54);
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.26),
+    inset 0 -0.5px 0 0 rgba(255, 255, 255, 0.14);
 }
 
 .collapsed-pill.has-warning:hover::before {
@@ -584,7 +592,7 @@ code {
 .expanded-card {
   position: relative;
   width: 100%;
-  height: min(100%, 558px);
+  height: min(100%, 563px);
   border: none;
   border-radius: 0 0 24px 24px;
   background: var(--liquid-glass-surface);
@@ -592,8 +600,7 @@ code {
   -webkit-backdrop-filter: blur(var(--liquid-glass-blur)) saturate(var(--liquid-glass-saturate));
   box-shadow:
     var(--liquid-glass-outer-ring),
-    var(--liquid-glass-inner-bevel),
-    var(--liquid-glass-shadow);
+    var(--liquid-glass-inner-bevel-docked);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -610,7 +617,7 @@ code {
   inset: 0;
   border-radius: inherit;
   padding: 0 1px 1px 1px;
-  background: var(--liquid-glass-rim-gradient);
+  background: var(--liquid-glass-rim-docked);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -626,9 +633,9 @@ code {
   border-radius: inherit;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.055) 0%,
-    rgba(255, 255, 255, 0.012) 14%,
-    transparent 28%
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.008) 12%,
+    transparent 24%
   );
   pointer-events: none;
   z-index: 3;
@@ -636,20 +643,42 @@ code {
 
 .expanded-card.floating-bezel {
   border-radius: 24px;
+  box-shadow:
+    var(--liquid-glass-outer-ring),
+    var(--liquid-glass-inner-bevel);
 }
 
 .expanded-card.floating-bezel::before {
   padding: 1px;
+  background: var(--liquid-glass-rim-gradient);
 }
 
 .island-header {
+  position: relative;
   min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 8px 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 100%);
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.075);
+  background: transparent;
+  border-bottom: none;
+}
+
+.island-header::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 0.5px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 16%,
+    rgba(255, 255, 255, 0.08) 84%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
 .brand-header {
