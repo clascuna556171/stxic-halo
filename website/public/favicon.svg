@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><style>@media (prefers-color-scheme: dark){[fill="#111111"]{fill:#F2F1EC}[stroke="#111111"]{stroke:#F2F1EC}[fill="#FFFFFF"]{fill:#0E0E0E}[stroke="#FFFFFF"]{stroke:#0E0E0E}}</style><g transform="translate(20.36 73.25)">
+        <g transform="rotate(-24 29.64 -23.25)"><ellipse cx="29.64" cy="-23.25" rx="46" ry="17" fill="none" stroke="#111111" stroke-width="6"/></g>
+        <path fill="#111111" d="M3.72 0L3.72-46.50L19.72-46.50L19.72-30.81L39.56-30.81L39.56-46.50L55.55-46.50L55.55 0L39.56 0L39.56-16.68L19.72-16.68L19.72 0L3.72 0Z"/>
+        <g transform="rotate(-24 29.64 -23.25)"><clipPath id="hl-light-i"><rect x="-30.36" y="-23.25" width="120" height="40"/></clipPath><g clip-path="url(#hl-light-i)"><ellipse cx="29.64" cy="-23.25" rx="46" ry="17" fill="none" stroke="#FFFFFF" stroke-width="16"/><ellipse cx="29.64" cy="-23.25" rx="46" ry="17" fill="none" stroke="#111111" stroke-width="6"/></g>
+        <circle cx="54.49" cy="-8.94" r="5.5" fill="#FF6A1A" stroke="#FFFFFF" stroke-width="3"/></g></g></svg>
